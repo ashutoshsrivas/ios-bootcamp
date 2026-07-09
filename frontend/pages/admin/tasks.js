@@ -1,0 +1,103 @@
+import { useEffect, useState } from 'react';
+import { useRequireRole } from '../../lib/auth';
+import { useBootcamp, scoped } from '../../lib/bootcamp';
+import { api } from '../../lib/api';
+import Layout, { PageHead } from '../../components/Layout';
+import {
+  Card, Button, Loading, useToast, Badge, Modal, Field, Input, Textarea, Empty,
+} from '../../components/UI';
+
+export default function AdminTasks() {
+  const { ok } = useRequireRole(['admin']);
+  const { bootcampId } = useBootcamp() || {};
+  const toast = useToast();
+  const [tasks, setTasks] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({});
+  const [busy, setBusy] = useState(false);
+  const [feedbackFor, setFeedbackFor] = useState(null);
+  const [feedback, setFeedback] = useState([]);
+
+  const load = async () => setTasks(await api.get(scoped('/api/tasks', bootcampId)));
+  useEffect(() => { if (ok && bootcampId) load().catch((e) => toast.err(e.message)); }, [ok, bootcampId]);
+
+  const save = async () => {
+    if (!form.title?.trim()) { toast.err('Title required'); return; }
+    setBusy(true);
+    try { await api.post('/api/tasks', { ...form, bootcamp_id: bootcampId }); setCreating(false); setForm({}); await load(); toast.ok('Task created'); }
+    catch (e) { toast.err(e.message); }
+    setBusy(false);
+  };
+  const remove = async (t) => {
+    if (!confirm(`Delete "${t.title}"?`)) return;
+    try { await api.del(`/api/tasks/${t.id}`); await load(); toast.show('Deleted'); } catch (e) { toast.err(e.message); }
+  };
+  const openFeedback = async (t) => {
+    setFeedbackFor(t);
+    try { setFeedback(await api.get(`/api/tasks/${t.id}/feedback`)); } catch (e) { toast.err(e.message); }
+  };
+
+  if (!ok || !bootcampId || !tasks) return <Layout><Loading /></Layout>;
+
+  return (
+    <Layout>
+      <PageHead
+        title="Tasks"
+        subtitle="Assign tasks to teams; mentors record feedback per team"
+        actions={<Button variant="primary" onClick={() => { setForm({}); setCreating(true); }}>+ New Task</Button>}
+      />
+
+      {tasks.length === 0 ? (
+        <Card><Empty icon="✅" title="No tasks yet" /></Card>
+      ) : (
+        <div className="grid cols-2">
+          {tasks.map((t) => (
+            <Card key={t.id}>
+              <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                <h3>{t.title}</h3>
+                {t.due_date && <Badge color="orange">Due {String(t.due_date).slice(0, 10)}</Badge>}
+              </div>
+              {t.description && <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 6 }}>{t.description}</p>}
+              <div className="hstack" style={{ marginTop: 12 }}>
+                <Button size="sm" onClick={() => openFeedback(t)}>View feedback</Button>
+                <Button size="sm" variant="ghost" onClick={() => remove(t)}>Delete</Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {creating && (
+        <Modal
+          title="New Task"
+          onClose={() => setCreating(false)}
+          footer={<><Button onClick={() => setCreating(false)}>Cancel</Button><Button variant="primary" onClick={save} disabled={busy}>Create</Button></>}
+        >
+          <Field label="Title"><Input value={form.title || ''} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
+          <Field label="Description"><Textarea value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
+          <Field label="Due date"><Input type="date" value={form.due_date || ''} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></Field>
+        </Modal>
+      )}
+
+      {feedbackFor && (
+        <Modal title={`Feedback · ${feedbackFor.title}`} wide onClose={() => setFeedbackFor(null)}>
+          {feedback.length === 0 ? (
+            <Empty icon="💬" title="No feedback yet" subtitle="Mentors haven't submitted feedback for this task." />
+          ) : (
+            <div className="vstack">
+              {feedback.map((f) => (
+                <div className="row" key={f.id} style={{ borderRadius: 10 }}>
+                  <div className="grow">
+                    <div className="title">{f.team_name} {f.score != null && <Badge color="green">{f.score}</Badge>}</div>
+                    <div className="desc">{f.feedback || <em>No comment</em>}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>— {f.mentor_name}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      )}
+    </Layout>
+  );
+}
