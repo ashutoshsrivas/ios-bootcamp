@@ -1,4 +1,5 @@
 const express = require('express');
+const archiver = require('archiver');
 const { q } = require('../db');
 const { authRequired, requireRole } = require('../middleware/auth');
 const { ah, HttpError } = require('../util');
@@ -107,6 +108,51 @@ router.get(
       [Number(req.params.id)]
     );
     res.json(rows);
+  })
+);
+
+// GET /api/questions/:id/answers.zip  (admin) — a zip of all uploaded files for this submission
+router.get(
+  '/:id/answers.zip',
+  requireRole('admin'),
+  ah(async (req, res) => {
+    const id = Number(req.params.id);
+    const question = (await q(`SELECT * FROM questions WHERE id = ?`, [id]))[0];
+    if (!question) throw new HttpError(404, 'Submission not found');
+    const answers = await q(
+      `SELECT a.file_url, a.file_name, s.name AS student_name
+       FROM answers a JOIN students s ON s.id = a.student_id
+       WHERE a.question_id = ? AND a.file_url IS NOT NULL AND a.file_url <> ''
+       ORDER BY s.name`,
+      [id]
+    );
+    if (!answers.length) throw new HttpError(404, 'No files have been submitted for this submission');
+
+    // Headers set only once we know we have files (so earlier errors stay JSON).
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="submission-${id}-files.zip"`);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', () => res.destroy());
+    archive.pipe(res);
+
+    let i = 0;
+    for (const a of answers) {
+      i++;
+      const fallback = a.file_url.split('/').pop() || 'file';
+      const base = (a.file_name || fallback).replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      const student = String(a.student_name || 'student').replace(/[^a-zA-Z0-9]/g, '_');
+      const name = `${String(i).padStart(2, '0')}-${student}-${base}`;
+      try {
+        // Objects are public-read, so fetch over the public URL (avoids IAM entirely).
+        const resp = await fetch(a.file_url);
+        if (!resp.ok) continue;
+        const buf = Buffer.from(await resp.arrayBuffer());
+        archive.append(buf, { name });
+      } catch {
+        /* skip a missing/unreachable file */
+      }
+    }
+    await archive.finalize();
   })
 );
 

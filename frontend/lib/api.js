@@ -46,6 +46,23 @@ export const api = {
     form.append('file', file);
     return request(path, { method: 'POST', body: form, isForm: true });
   },
+  // Fetch a binary response (with auth) and trigger a browser download.
+  downloadFile: async (path, filename) => {
+    const token = getToken();
+    const res = await fetch(`${BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      let msg = `Download failed (${res.status})`;
+      try { msg = JSON.parse(text).error || msg; } catch { /* keep default */ }
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  },
 };
 
 export { BASE };

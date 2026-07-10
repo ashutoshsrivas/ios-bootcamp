@@ -49,4 +49,23 @@ async function signedUrlFor(key, expiresIn = 3600) {
   });
 }
 
-module.exports = { uploadBuffer, signedUrlFor };
+// Derive the S3 object key from a stored public URL (works for either URL format).
+function keyFromUrl(url) {
+  if (!url) return null;
+  const i = url.indexOf(config.s3.prefix);
+  if (i >= 0) return url.slice(i);
+  try {
+    const p = new URL(url).pathname.replace(/^\/+/, '');
+    return p.startsWith(config.s3.bucket + '/') ? p.slice(config.s3.bucket.length + 1) : p;
+  } catch {
+    return null;
+  }
+}
+
+// Returns a readable stream for an object (used to zip files).
+async function getObjectStream(key) {
+  const res = await client.send(new GetObjectCommand({ Bucket: config.s3.bucket, Key: key }));
+  return res.Body;
+}
+
+module.exports = { uploadBuffer, signedUrlFor, keyFromUrl, getObjectStream };

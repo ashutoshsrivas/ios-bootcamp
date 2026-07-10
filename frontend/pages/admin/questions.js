@@ -68,6 +68,38 @@ export default function AdminQuestions() {
     try { setAnswers(await api.get(`/api/questions/${q.id}/answers`)); } catch (e) { toast.err(e.message); }
   };
 
+  const exportCsv = async (question) => {
+    try {
+      const rows = await api.get(`/api/questions/${question.id}/answers`);
+      const esc = (c) => {
+        const s = c == null ? '' : String(c);
+        return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const header = ['S.No', 'Student', 'Email', 'Team', 'Answer', 'File Name', 'File URL', 'Submitted At'];
+      const body = rows.map((a, i) => {
+        const answer = a.file_url ? (a.file_name || 'file')
+          : a.value_number != null ? a.value_number
+          : (a.value_text || '');
+        return [i + 1, a.student_name, a.student_email, a.team_name || '', answer, a.file_name || '', a.file_url || '', a.updated_at || a.created_at || ''];
+      });
+      const csv = '﻿' + [header, ...body].map((r) => r.map(esc).join(',')).join('\r\n');
+      const slug = question.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'submission';
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const el = document.createElement('a');
+      el.href = url; el.download = `submission-${slug}.csv`;
+      document.body.appendChild(el); el.click(); el.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) { toast.err(e.message); }
+  };
+
+  const downloadZip = async (question) => {
+    const slug = question.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'submission';
+    try {
+      await api.downloadFile(`/api/questions/${question.id}/answers.zip`, `submission-${slug}-files.zip`);
+    } catch (e) { toast.err(e.message); }
+  };
+
   if (!ok || !bootcampId || !questions) return <Layout><Loading /></Layout>;
 
   return (
@@ -93,6 +125,10 @@ export default function AdminQuestions() {
                 </div>
               </div>
               <Button size="sm" onClick={() => openAnswers(q)}>{q.answer_count} answer{q.answer_count === 1 ? '' : 's'}</Button>
+              <Button size="sm" onClick={() => exportCsv(q)} disabled={!q.answer_count}>⤓ CSV</Button>
+              {q.input_type === 'file' && (
+                <Button size="sm" onClick={() => downloadZip(q)} disabled={!q.answer_count}>⤓ Files</Button>
+              )}
               <Button size="sm" variant="ghost" onClick={() => remove(q)}>Delete</Button>
             </div>
           ))}
