@@ -42,7 +42,7 @@ export default function AdminTasks() {
   return (
     <Layout>
       <PageHead
-        title="Tasks"
+        title="Task & Feedback"
         subtitle="Assign tasks to teams; mentors record feedback per team"
         actions={<Button variant="primary" onClick={() => { setForm({}); setCreating(true); }}>+ New Task</Button>}
       />

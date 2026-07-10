@@ -20,9 +20,9 @@ const NAV = {
     ] },
     { section: 'Assessment', items: [
       { href: '/admin/rubrics', label: 'Rubrics', icon: 'sliders' },
-      { href: '/admin/tasks', label: 'Tasks', icon: 'check' },
-      { href: '/admin/questions', label: 'Questions', icon: 'chat' },
-      { href: '/admin/reports', label: 'Results', icon: 'chart' },
+      { href: '/admin/tasks', label: 'Task & Feedback', icon: 'check' },
+      { href: '/admin/questions', label: 'Submissions', icon: 'chat' },
+      { href: '/admin/reports', label: 'Result & remarks', icon: 'chart' },
     ] },
     { section: 'People', items: [
       { href: '/admin/users', label: 'Users', icon: 'person' },

@@ -73,7 +73,7 @@ export default function AdminQuestions() {
   return (
     <Layout>
       <PageHead
-        title="Questions"
+        title="Submissions"
         subtitle="Collect responses from students — choose the input type and who answers"
         actions={<Button variant="primary" onClick={openNew}>+ New Question</Button>}
       />

@@ -60,7 +60,9 @@ async function parseRosterBuffer(buffer) {
 async function upsertRoster(rows) {
   let inserted = 0;
   let updated = 0;
+  let seq = 0; // preserves the row order from the uploaded file
   for (const r of rows) {
+    seq += 1;
     const sid = r.student_id || null;
     let existing = [];
     if (sid) existing = await q(`SELECT id FROM roster WHERE student_id = ?`, [sid]);
@@ -74,16 +76,17 @@ async function upsertRoster(rows) {
       r.campus || null,
       r.test_no || null,
       r.status || null,
+      seq,
     ];
     if (existing.length) {
       await q(
-        `UPDATE roster SET student_id=?, full_name=?, email=?, phone=?, campus=?, test_no=?, status=? WHERE id=?`,
+        `UPDATE roster SET student_id=?, full_name=?, email=?, phone=?, campus=?, test_no=?, status=?, sort_order=? WHERE id=?`,
         [...fields, existing[0].id]
       );
       updated++;
     } else {
       await q(
-        `INSERT INTO roster (student_id, full_name, email, phone, campus, test_no, status) VALUES (?,?,?,?,?,?,?)`,
+        `INSERT INTO roster (student_id, full_name, email, phone, campus, test_no, status, sort_order) VALUES (?,?,?,?,?,?,?,?)`,
         fields
       );
       inserted++;

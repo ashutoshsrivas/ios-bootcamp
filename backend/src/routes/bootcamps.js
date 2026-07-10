@@ -18,6 +18,26 @@ router.get(
   })
 );
 
+// GET /api/bootcamps/stats  (admin) — per-bootcamp counts for the dashboard
+router.get(
+  '/stats',
+  requireRole('admin'),
+  ah(async (_req, res) => {
+    const rows = await q(
+      `SELECT b.id, b.name, b.status, b.registration_open,
+              COUNT(s.id) AS students,
+              SUM(s.status = 'pending')  AS pending,
+              SUM(s.status = 'approved') AS approved,
+              (SELECT COUNT(*) FROM teams t WHERE t.bootcamp_id = b.id) AS teams
+       FROM bootcamps b
+       LEFT JOIN students s ON s.bootcamp_id = b.id
+       GROUP BY b.id, b.name, b.status, b.registration_open
+       ORDER BY b.created_at`
+    );
+    res.json(rows);
+  })
+);
+
 // POST /api/bootcamps  (admin)
 router.post(
   '/',

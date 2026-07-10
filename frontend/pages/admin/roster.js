@@ -56,6 +56,14 @@ export default function AdminRoster() {
   if (!ok || !rows) return <Layout><Loading /></Layout>;
 
   const q = search.trim().toLowerCase();
+  // Stable serial number = position in the uploaded list (backend returns it in sequence).
+  const snoById = new Map(rows.map((r, i) => [r.id, i + 1]));
+  const statusColor = (s) => {
+    const v = String(s || '').toUpperCase();
+    if (v === 'CNF') return 'green';
+    if (v === 'WL') return 'orange';
+    return 'gray';
+  };
   const filtered = q
     ? rows.filter((r) => [r.full_name, r.email, r.student_id, r.phone, r.campus].some((v) => String(v || '').toLowerCase().includes(q)))
     : rows;
@@ -88,18 +96,19 @@ export default function AdminRoster() {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Student Id</th><th>Name</th><th>Email</th><th>Phone</th><th>Campus</th><th>Status</th><th></th>
+                <th>S.No.</th><th>Student Id</th><th>Name</th><th>Email</th><th>Phone</th><th>Campus</th><th>Status</th><th></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((r) => (
                 <tr key={r.id}>
+                  <td className="mono" style={{ color: 'var(--muted)' }}>{snoById.get(r.id)}</td>
                   <td className="mono">{r.student_id || '—'}</td>
                   <td style={{ fontWeight: 550 }}>{r.full_name}</td>
                   <td style={{ color: 'var(--muted)' }}>{r.email || '—'}</td>
                   <td style={{ color: 'var(--muted)' }}>{r.phone || '—'}</td>
                   <td style={{ color: 'var(--muted)' }}>{r.campus || '—'}</td>
-                  <td>{r.status ? <Badge color="gray">{r.status}</Badge> : '—'}</td>
+                  <td>{r.status ? <Badge color={statusColor(r.status)}>{r.status}</Badge> : '—'}</td>
                   <td>
                     <div className="hstack" style={{ flexWrap: 'nowrap', justifyContent: 'flex-end' }}>
                       <Button size="sm" onClick={() => openEdit(r)}>Edit</Button>

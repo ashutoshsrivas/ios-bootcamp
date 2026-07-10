@@ -14,12 +14,13 @@ export default function AdminDashboard() {
 
   const load = useCallback(async () => {
     if (!bootcampId) return;
-    const [students, teams, users] = await Promise.all([
+    const [students, teams, users, bcStats] = await Promise.all([
       api.get(scoped('/api/students', bootcampId)),
       api.get(scoped('/api/teams', bootcampId)),
       api.get('/api/users'),
+      api.get('/api/bootcamps/stats'),
     ]);
-    setData({ students, teams, users });
+    setData({ students, teams, users, bcStats });
   }, [bootcampId]);
 
   useEffect(() => { if (ok && bootcampId) load().catch((e) => toast.err(e.message)); }, [ok, bootcampId, load]);
@@ -84,6 +85,7 @@ export default function AdminDashboard() {
         </div>
       </Card>
 
+      <h2 style={{ margin: '4px 0 12px' }}>{currentBootcamp?.name} · overview</h2>
       <div className="grid cols-3">
         {stats.map((s) => (
           <Card key={s.l}>
@@ -93,6 +95,31 @@ export default function AdminDashboard() {
             </div>
           </Card>
         ))}
+      </div>
+
+      <h2 style={{ margin: '24px 0 12px' }}>Bootcamp-wise data</h2>
+      <div className="tbl-wrap">
+        <table className="tbl">
+          <thead>
+            <tr><th>Bootcamp</th><th>Registrations</th><th>Pending</th><th>Approved</th><th>Teams</th><th>Registration</th></tr>
+          </thead>
+          <tbody>
+            {(data.bcStats || []).map((b) => (
+              <tr key={b.id} style={b.id === bootcampId ? { background: 'var(--accent-tint)' } : undefined}>
+                <td style={{ fontWeight: 550, color: 'var(--text)' }}>
+                  {b.name}{' '}
+                  {b.id === bootcampId && <Badge color="orange">selected</Badge>}{' '}
+                  {b.status === 'archived' && <Badge color="gray">archived</Badge>}
+                </td>
+                <td>{Number(b.students)}</td>
+                <td>{Number(b.pending)}</td>
+                <td>{Number(b.approved)}</td>
+                <td>{Number(b.teams)}</td>
+                <td>{b.registration_open ? <Badge color="green">Open</Badge> : <Badge color="red">Closed</Badge>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </Layout>
   );

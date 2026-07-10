@@ -51,7 +51,8 @@ export default function AdminStudents() {
     try {
       const res = await api.post('/api/students/approve-all', { bootcamp_id: bootcampId });
       await load();
-      toast.ok(`Approved ${res.approved} student${res.approved === 1 ? '' : 's'} · default password ${res.defaultPassword}`);
+      const skip = res.skipped ? ` · skipped ${res.skipped} approved elsewhere` : '';
+      toast.ok(`Approved ${res.approved} student${res.approved === 1 ? '' : 's'} · default password ${res.defaultPassword}${skip}`);
     } catch (e) { toast.err(e.message); }
   };
 

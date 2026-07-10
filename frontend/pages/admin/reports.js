@@ -185,9 +185,9 @@ export default function AdminReports() {
   return (
     <Layout>
       <PageHead
-        title="Results"
+        title="Result & remarks"
         subtitle="Assessment analytics — rubric marks, mentor remarks, and team & student stats"
-        crumb="Results"
+        crumb="Result & remarks"
         actions={<Button onClick={exportCurrent}>⤓ Export {tab === 'rubrics' ? 'rubric' : tab === 'matrix' ? 'matrix' : tab === 'teams' ? 'teams' : 'students'} CSV</Button>}
       />
 

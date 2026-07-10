@@ -29,12 +29,12 @@ router.get(
   })
 );
 
-// GET /api/roster  (admin) — full directory
+// GET /api/roster  (admin) — full directory, in the order it was uploaded
 router.get(
   '/',
   requireRole('admin'),
   ah(async (_req, res) => {
-    res.json(await q(`SELECT * FROM roster ORDER BY full_name`));
+    res.json(await q(`SELECT * FROM roster ORDER BY (sort_order IS NULL), sort_order, id`));
   })
 );
 

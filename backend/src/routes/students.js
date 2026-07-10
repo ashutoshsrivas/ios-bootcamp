@@ -10,6 +10,16 @@ router.use(authRequired);
 // Default password every approved student gets; they change it from Settings.
 const DEFAULT_STUDENT_PASSWORD = '12345678';
 
+// Returns the name of another bootcamp where this email is already approved, else null.
+async function approvedElsewhere(email, exceptBootcampId) {
+  const rows = await q(
+    `SELECT b.name FROM students s JOIN bootcamps b ON b.id = s.bootcamp_id
+     WHERE s.email = ? AND s.status = 'approved' AND s.bootcamp_id <> ? LIMIT 1`,
+    [String(email).toLowerCase().trim(), Number(exceptBootcampId)]
+  );
+  return rows[0]?.name || null;
+}
+
 // Approve one student row: provision (or reuse) a login, then mark approved.
 async function approveStudent(student, adminId) {
   if (student.status === 'approved') return;
@@ -81,6 +91,10 @@ router.post(
     ]);
     if (dup.length) throw new HttpError(409, 'This student is already registered for this bootcamp');
 
+    const other = await approvedElsewhere(email, bootcamp_id);
+    if (other)
+      throw new HttpError(409, `This student is already approved in "${other}". Remove them there before registering here.`);
+
     const result = await q(
       `INSERT INTO students (bootcamp_id, roster_id, name, email, phone, college, branch, year, roll_no, notes, status, registered_by)
        VALUES (?,?,?,?,?,?,?,?,?,?, 'pending', ?)`,
@@ -131,6 +145,9 @@ router.post(
     const rows = await q(`SELECT * FROM students WHERE id = ?`, [id]);
     const student = rows[0];
     if (!student) throw new HttpError(404, 'Student not found');
+    const other = await approvedElsewhere(student.email, student.bootcamp_id);
+    if (other)
+      throw new HttpError(409, `This student is already approved in "${other}". Remove them there first.`);
     const isNew = !student.user_id;
     await approveStudent(student, req.user.id);
     res.json({
@@ -152,8 +169,14 @@ router.post(
       `SELECT * FROM students WHERE bootcamp_id = ? AND status = 'pending'`,
       [bootcampId]
     );
-    for (const student of pending) await approveStudent(student, req.user.id);
-    res.json({ approved: pending.length, defaultPassword: DEFAULT_STUDENT_PASSWORD });
+    let approved = 0;
+    let skipped = 0;
+    for (const student of pending) {
+      if (await approvedElsewhere(student.email, student.bootcamp_id)) { skipped++; continue; }
+      await approveStudent(student, req.user.id);
+      approved++;
+    }
+    res.json({ approved, skipped, defaultPassword: DEFAULT_STUDENT_PASSWORD });
   })
 );
 
