@@ -132,6 +132,21 @@ router.post(
   ah(async (req, res) => {
     const { team_id, scores } = req.body || {};
     if (!Array.isArray(scores)) throw new HttpError(400, 'scores must be an array');
+
+    // Reject any score above its criterion's max (or below 0).
+    const crit = await q(`SELECT id, name, max_score FROM rubric_criteria WHERE rubric_id = ?`, [
+      Number(req.params.id),
+    ]);
+    const critById = Object.fromEntries(crit.map((c) => [c.id, c]));
+    for (const s of scores) {
+      if (s.score === '' || s.score === null || s.score === undefined) continue;
+      const c = critById[s.criteria_id];
+      const n = Number(s.score);
+      if (!c) throw new HttpError(400, 'Score refers to a criterion outside this rubric');
+      if (Number.isNaN(n) || n < 0 || n > Number(c.max_score))
+        throw new HttpError(400, `Score for "${c.name}" must be between 0 and ${c.max_score}`);
+    }
+
     for (const s of scores) {
       if (s.score === '' || s.score === null || s.score === undefined) continue;
       await q(

@@ -50,29 +50,44 @@ export default function MentorAssess() {
   const setTeamCell = (cid, key, val) => setTeamScores((m) => ({ ...m, [cid]: { ...m[cid], [key]: val } }));
 
   const save = async () => {
+    // Validate: no score above the criterion max (or below 0).
+    const maxOf = {};
+    detail.rubric.criteria.forEach((c) => { maxOf[c.id] = Number(c.max_score); });
+    const nameOf = {};
+    detail.rubric.criteria.forEach((c) => { nameOf[c.id] = c.name; });
+    let bad = null;
+    const collect = (cid, val) => {
+      if (val === '' || val == null) return null;
+      const n = Number(val);
+      if (Number.isNaN(n) || n < 0 || n > maxOf[cid]) {
+        bad = bad || `“${nameOf[cid]}” must be between 0 and ${maxOf[cid]}`;
+        return null;
+      }
+      return n;
+    };
+
+    const payload = [];
+    if (mode === 'team') {
+      detail.students.forEach((s) => {
+        detail.rubric.criteria.forEach((c) => {
+          const cell = teamScores[c.id];
+          const n = collect(c.id, cell?.score);
+          if (n != null) payload.push({ criteria_id: c.id, student_id: s.id, score: n, comment: cell.comment || '' });
+        });
+      });
+    } else {
+      detail.students.forEach((s) => {
+        detail.rubric.criteria.forEach((c) => {
+          const cell = scores[`${s.id}:${c.id}`];
+          const n = collect(c.id, cell?.score);
+          if (n != null) payload.push({ criteria_id: c.id, student_id: s.id, score: n, comment: cell.comment || '' });
+        });
+      });
+    }
+    if (bad) { toast.err(bad); return; }
+
     setBusy(true);
     try {
-      const payload = [];
-      if (mode === 'team') {
-        // One set of scores → copied to every team member.
-        detail.students.forEach((s) => {
-          detail.rubric.criteria.forEach((c) => {
-            const cell = teamScores[c.id];
-            if (cell && cell.score !== '' && cell.score != null) {
-              payload.push({ criteria_id: c.id, student_id: s.id, score: cell.score, comment: cell.comment || '' });
-            }
-          });
-        });
-      } else {
-        detail.students.forEach((s) => {
-          detail.rubric.criteria.forEach((c) => {
-            const cell = scores[`${s.id}:${c.id}`];
-            if (cell && cell.score !== '' && cell.score != null) {
-              payload.push({ criteria_id: c.id, student_id: s.id, score: cell.score, comment: cell.comment || '' });
-            }
-          });
-        });
-      }
       await api.post(`/api/rubrics/${rubricId}/scores`, { team_id: Number(teamId), scores: payload });
       // Refresh so the other mode reflects the new values.
       await loadScores(rubricId, teamId);
@@ -82,6 +97,10 @@ export default function MentorAssess() {
   };
 
   if (!ok || !rubrics) return <Layout><Loading /></Layout>;
+
+  const overMax = (val, max) => val !== '' && val != null && (Number(val) > Number(max) || Number(val) < 0);
+  const scoreStyle = (val, max) =>
+    (overMax(val, max) ? { flex: 1, borderColor: 'var(--red)', boxShadow: '0 0 0 3px var(--red-tint)' } : { flex: 1 });
 
   return (
     <Layout>
@@ -141,7 +160,7 @@ export default function MentorAssess() {
                     return (
                       <div className="hstack" key={c.id} style={{ gap: 10 }}>
                         <div style={{ flex: 2 }}>{c.name} <Badge color="gray">/{c.max_score}</Badge></div>
-                        <Input style={{ flex: 1 }} type="number" min={0} max={c.max_score} placeholder="Score"
+                        <Input style={scoreStyle(cell.score, c.max_score)} type="number" min={0} max={c.max_score} placeholder="Score"
                           value={cell.score ?? ''} onChange={(e) => setTeamCell(c.id, 'score', e.target.value)} />
                         <Input style={{ flex: 2 }} placeholder="Comment (optional)"
                           value={cell.comment ?? ''} onChange={(e) => setTeamCell(c.id, 'comment', e.target.value)} />
@@ -166,7 +185,7 @@ export default function MentorAssess() {
                       return (
                         <div className="hstack" key={c.id} style={{ gap: 10 }}>
                           <div style={{ flex: 2 }}>{c.name} <Badge color="gray">/{c.max_score}</Badge></div>
-                          <Input style={{ flex: 1 }} type="number" min={0} max={c.max_score} placeholder="Score"
+                          <Input style={scoreStyle(cell.score, c.max_score)} type="number" min={0} max={c.max_score} placeholder="Score"
                             value={cell.score ?? ''} onChange={(e) => setCell(s.id, c.id, 'score', e.target.value)} />
                           <Input style={{ flex: 2 }} placeholder="Comment (optional)"
                             value={cell.comment ?? ''} onChange={(e) => setCell(s.id, c.id, 'comment', e.target.value)} />
