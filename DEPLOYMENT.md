@@ -117,13 +117,20 @@ Open **https://iosdc.geu.ac.in/bootcamp** and sign in with the admin email/passw
 
 ## Updating later
 
+Use a **hard reset to the remote**, not `git pull` — `npm install` rewrites the committed
+`package-lock.json` files on this (ARM) box, which leaves the tree dirty and makes `git pull`
+abort. `.env` is gitignored so the reset never touches it.
+
 ```bash
 cd /home/ubuntu/ios-bootcamp
-git pull
-cd backend  && npm ci --omit=dev && cd ..
-cd frontend && npm ci && npm run build && cd ..
-pm2 restart ecosystem.config.js
+git fetch origin && git reset --hard origin/main   # discards regenerated lockfiles
+cd backend  && npm install --omit=dev && cd ..
+cd frontend && npm install && npm run build && cd ..
+pm2 restart bootcamp-api bootcamp-web
 ```
+
+Verify HEAD moved (`git rev-parse --short HEAD`) and the build picked up your change before
+declaring success — don't rely on an HTTP 200 alone.
 
 ## Notes / gotchas
 
