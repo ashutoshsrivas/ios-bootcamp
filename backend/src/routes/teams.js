@@ -6,6 +6,47 @@ const { ah, HttpError } = require('../util');
 const router = express.Router();
 router.use(authRequired);
 
+// ---- Physical table IDs: A..Y, each with a MIN and MAX half (A-MIN, A-MAX, B-MIN, …) ----
+const TABLE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXY'; // A..Y (no Z), per requirement
+function letterAt(i) {
+  if (i < 25) return TABLE_ALPHABET[i];
+  const j = i - 25;
+  return TABLE_ALPHABET[Math.floor(j / 25)] + TABLE_ALPHABET[j % 25];
+}
+function tableIdSequence(count) {
+  const ids = [];
+  for (let i = 0; ids.length < count; i++) {
+    const letter = letterAt(i);
+    ids.push(`${letter}-MIN`);
+    if (ids.length < count) ids.push(`${letter}-MAX`);
+  }
+  return ids;
+}
+
+// Fill table IDs for teams that don't have one yet, in team order (leaves existing ones intact).
+async function assignTablesFill(bootcampId) {
+  const teams = await q(`SELECT id, table_id FROM teams WHERE bootcamp_id = ? ORDER BY id`, [bootcampId]);
+  const used = new Set(teams.map((t) => t.table_id).filter(Boolean));
+  const seq = tableIdSequence(teams.length + used.size + 4);
+  let ptr = 0;
+  for (const t of teams) {
+    if (t.table_id) continue;
+    while (ptr < seq.length && used.has(seq[ptr])) ptr++;
+    const id = seq[ptr++];
+    used.add(id);
+    await q(`UPDATE teams SET table_id = ? WHERE id = ?`, [id, t.id]);
+  }
+}
+
+// Re-number every team's table ID strictly in team order (overwrites existing).
+async function assignTablesReset(bootcampId) {
+  const teams = await q(`SELECT id FROM teams WHERE bootcamp_id = ? ORDER BY id`, [bootcampId]);
+  const seq = tableIdSequence(teams.length);
+  for (let i = 0; i < teams.length; i++) {
+    await q(`UPDATE teams SET table_id = ? WHERE id = ?`, [seq[i], teams[i].id]);
+  }
+}
+
 // Assemble full team objects (members, mentors, spoc) for one bootcamp.
 async function loadTeams(bootcampId) {
   const teams = await q(`SELECT * FROM teams WHERE bootcamp_id = ? ORDER BY id`, [bootcampId]);
@@ -49,6 +90,7 @@ router.post(
     const r = await q(`INSERT INTO teams (name, bootcamp_id) VALUES (?, ?)`, [
       name.trim(), Number(bootcamp_id),
     ]);
+    await assignTablesFill(Number(bootcamp_id));
     res.status(201).json({ id: r.insertId });
   })
 );
@@ -88,6 +130,7 @@ router.post(
           ]);
         }
         await conn.commit();
+        await assignTablesFill(bootcampId);
         return res.json({ created: teamCount, placed: 0 });
       }
 
@@ -116,6 +159,7 @@ router.post(
         ]);
       }
       await conn.commit();
+      await assignTablesFill(bootcampId);
       res.json({ created: numTeams, placed: students.length });
     } catch (e) {
       await conn.rollback();
@@ -203,6 +247,44 @@ router.put(
       if (!m.length) throw new HttpError(400, 'SPOC must be a member of the team');
     }
     await q(`UPDATE teams SET spoc_student_id = ? WHERE id = ?`, [studentId, teamId]);
+    res.json({ ok: true });
+  })
+);
+
+// POST /api/teams/assign-tables  { bootcamp_id, reset }  (admin)
+router.post(
+  '/assign-tables',
+  requireRole('admin'),
+  ah(async (req, res) => {
+    const bootcampId = Number(req.body?.bootcamp_id);
+    if (!bootcampId) throw new HttpError(400, 'bootcamp_id is required');
+    if (req.body?.reset) await assignTablesReset(bootcampId);
+    else await assignTablesFill(bootcampId);
+    res.json({ ok: true });
+  })
+);
+
+// PUT /api/teams/:id/table  { tableId }  (admin) — set/swap a team's table ID
+router.put(
+  '/:id/table',
+  requireRole('admin'),
+  ah(async (req, res) => {
+    const teamId = Number(req.params.id);
+    const tableId = req.body?.tableId ? String(req.body.tableId).trim() : null;
+    const rows = await q(`SELECT id, bootcamp_id, table_id FROM teams WHERE id = ?`, [teamId]);
+    const team = rows[0];
+    if (!team) throw new HttpError(404, 'Team not found');
+    if (tableId) {
+      // If another team in this bootcamp holds this table ID, swap it to our old one.
+      const other = await q(
+        `SELECT id FROM teams WHERE bootcamp_id = ? AND table_id = ? AND id <> ?`,
+        [team.bootcamp_id, tableId, teamId]
+      );
+      if (other.length) {
+        await q(`UPDATE teams SET table_id = ? WHERE id = ?`, [team.table_id, other[0].id]);
+      }
+    }
+    await q(`UPDATE teams SET table_id = ? WHERE id = ?`, [tableId, teamId]);
     res.json({ ok: true });
   })
 );

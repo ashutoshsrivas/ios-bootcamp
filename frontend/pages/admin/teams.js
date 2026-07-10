@@ -7,6 +7,18 @@ import {
   Card, Button, Loading, useToast, Badge, Modal, Field, Input, Select, Empty, Textarea, Switch,
 } from '../../components/UI';
 
+// Table IDs: A..Y, each with MIN and MAX (A-MIN, A-MAX, B-MIN, …). Mirrors the backend.
+const TABLE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXY';
+const letterAt = (i) => (i < 25 ? TABLE_ALPHABET[i] : TABLE_ALPHABET[Math.floor((i - 25) / 25)] + TABLE_ALPHABET[(i - 25) % 25]);
+function tableIdSequence(count) {
+  const ids = [];
+  for (let i = 0; ids.length < count; i++) {
+    ids.push(`${letterAt(i)}-MIN`);
+    if (ids.length < count) ids.push(`${letterAt(i)}-MAX`);
+  }
+  return ids;
+}
+
 export default function AdminTeams() {
   const { ok } = useRequireRole(['admin']);
   const { bootcampId } = useBootcamp() || {};
@@ -93,8 +105,21 @@ export default function AdminTeams() {
     try { await api.put(`/api/teams/${teamId}`, { remarks }); await load(); toast.ok('Remark saved'); }
     catch (e) { toast.err(e.message); }
   };
+  const setTable = async (teamId, tableId) => {
+    try { await api.put(`/api/teams/${teamId}/table`, { tableId: tableId || null }); await load(); }
+    catch (e) { toast.err(e.message); }
+  };
+  const assignTables = async () => {
+    if (!confirm('Re-number all table IDs in team order? This overwrites current table IDs.')) return;
+    try { await api.post('/api/teams/assign-tables', { bootcamp_id: bootcampId, reset: true }); await load(); toast.ok('Table IDs assigned'); }
+    catch (e) { toast.err(e.message); }
+  };
 
   if (!ok || !teams) return <Layout><Loading /></Layout>;
+
+  // Table-ID options: the full set A-MIN … Y-MAX (50), plus any custom ones already in use.
+  const baseSeq = tableIdSequence(50);
+  const tableOptions = [...baseSeq, ...teams.map((t) => t.table_id).filter((id) => id && !baseSeq.includes(id))];
 
   const chip = (s, teamId) => (
     <div
@@ -116,6 +141,7 @@ export default function AdminTeams() {
         subtitle="Auto-build teams, then drag students between them"
         actions={
           <>
+            {teams.length > 0 && <Button onClick={assignTables}>⤵ Assign tables</Button>}
             <Button onClick={addTeam}>+ New Team</Button>
             <Button variant="primary" onClick={() => setAutoOpen(true)}>Auto-create Teams</Button>
           </>
@@ -156,7 +182,22 @@ export default function AdminTeams() {
             >
               <div className="hstack" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
                 <h3>{t.name}</h3>
-                <Badge color="gray">{t.members.length}</Badge>
+                <div className="hstack" style={{ gap: 6 }}>
+                  {t.table_id && <Badge color="orange">{t.table_id}</Badge>}
+                  <Badge color="gray">{t.members.length}</Badge>
+                </div>
+              </div>
+
+              <div className="hstack" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
+                <span className="kicker">Table</span>
+                <Select
+                  value={t.table_id || ''}
+                  onChange={(e) => setTable(t.id, e.target.value)}
+                  style={{ maxWidth: 150, padding: '6px 10px', fontSize: 13 }}
+                >
+                  <option value="">— none —</option>
+                  {tableOptions.map((id) => <option key={id} value={id}>{id}</option>)}
+                </Select>
               </div>
 
               <div style={{ minHeight: 30 }}>

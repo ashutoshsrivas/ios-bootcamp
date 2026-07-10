@@ -3,6 +3,8 @@
 *.key
 *.env
 .env*
+# ...but the frontend production env holds only PUBLIC build values (basePath, API URL)
+!frontend/.env.production
 
 # OS files
 .DS_Store
