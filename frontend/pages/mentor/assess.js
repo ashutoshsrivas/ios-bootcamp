@@ -3,7 +3,7 @@ import { useRequireRole } from '../../lib/auth';
 import { useBootcamp, scoped } from '../../lib/bootcamp';
 import { api } from '../../lib/api';
 import Layout, { PageHead } from '../../components/Layout';
-import { Card, Button, Loading, useToast, Badge, Avatar, Select, Input, Empty } from '../../components/UI';
+import { Card, Button, Loading, useToast, Badge, Avatar, Select, Input, Empty, Segmented } from '../../components/UI';
 
 export default function MentorAssess() {
   const { ok } = useRequireRole(['mentor']);
@@ -13,8 +13,10 @@ export default function MentorAssess() {
   const [teams, setTeams] = useState([]);
   const [rubricId, setRubricId] = useState('');
   const [teamId, setTeamId] = useState('');
+  const [mode, setMode] = useState('individual'); // 'individual' | 'team'
   const [detail, setDetail] = useState(null); // { rubric, students }
   const [scores, setScores] = useState({}); // `${studentId}:${critId}` -> {score, comment}
+  const [teamScores, setTeamScores] = useState({}); // `${critId}` -> {score, comment}  (team mode)
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -32,27 +34,49 @@ export default function MentorAssess() {
       const map = {};
       data.scores.forEach((s) => { map[`${s.student_id}:${s.criteria_id}`] = { score: s.score, comment: s.comment || '' }; });
       setScores(map);
+      // Team-level prefill: take any existing member score per criterion (they're identical if saved as a team).
+      const tmap = {};
+      data.rubric.criteria.forEach((c) => {
+        const found = data.scores.find((s) => s.criteria_id === c.id);
+        if (found) tmap[c.id] = { score: found.score, comment: found.comment || '' };
+      });
+      setTeamScores(tmap);
     } catch (e) { toast.err(e.message); }
   };
 
   const onRubric = (v) => { setRubricId(v); loadScores(v, teamId); };
   const onTeam = (v) => { setTeamId(v); loadScores(rubricId, v); };
   const setCell = (sid, cid, key, val) => setScores((m) => ({ ...m, [`${sid}:${cid}`]: { ...m[`${sid}:${cid}`], [key]: val } }));
+  const setTeamCell = (cid, key, val) => setTeamScores((m) => ({ ...m, [cid]: { ...m[cid], [key]: val } }));
 
   const save = async () => {
     setBusy(true);
     try {
       const payload = [];
-      detail.students.forEach((s) => {
-        detail.rubric.criteria.forEach((c) => {
-          const cell = scores[`${s.id}:${c.id}`];
-          if (cell && cell.score !== '' && cell.score != null) {
-            payload.push({ criteria_id: c.id, student_id: s.id, score: cell.score, comment: cell.comment || '' });
-          }
+      if (mode === 'team') {
+        // One set of scores → copied to every team member.
+        detail.students.forEach((s) => {
+          detail.rubric.criteria.forEach((c) => {
+            const cell = teamScores[c.id];
+            if (cell && cell.score !== '' && cell.score != null) {
+              payload.push({ criteria_id: c.id, student_id: s.id, score: cell.score, comment: cell.comment || '' });
+            }
+          });
         });
-      });
+      } else {
+        detail.students.forEach((s) => {
+          detail.rubric.criteria.forEach((c) => {
+            const cell = scores[`${s.id}:${c.id}`];
+            if (cell && cell.score !== '' && cell.score != null) {
+              payload.push({ criteria_id: c.id, student_id: s.id, score: cell.score, comment: cell.comment || '' });
+            }
+          });
+        });
+      }
       await api.post(`/api/rubrics/${rubricId}/scores`, { team_id: Number(teamId), scores: payload });
-      toast.ok('Scores saved');
+      // Refresh so the other mode reflects the new values.
+      await loadScores(rubricId, teamId);
+      toast.ok(mode === 'team' ? `Team score saved to all ${detail.students.length} members` : 'Scores saved');
     } catch (e) { toast.err(e.message); }
     setBusy(false);
   };
@@ -80,6 +104,22 @@ export default function MentorAssess() {
             </Select>
           </div>
         </div>
+        <div className="field" style={{ margin: 0 }}>
+          <label>Assess by</label>
+          <Segmented
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: 'individual', label: 'Individual members' },
+              { value: 'team', label: 'Whole team' },
+            ]}
+          />
+          <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 8 }}>
+            {mode === 'team'
+              ? 'Enter one score per criterion — the same score & comment are applied to every team member.'
+              : 'Score each team member separately.'}
+          </p>
+        </div>
       </Card>
 
       {rubrics.length === 0 && <Card><Empty icon="📋" title="No rubrics" subtitle="Ask an admin to create a rubric." /></Card>}
@@ -89,31 +129,57 @@ export default function MentorAssess() {
           <Card><Empty icon="🧑‍🎓" title="No students on this team" /></Card>
         ) : (
           <>
-            {detail.students.map((s) => (
-              <Card key={s.id}>
-                <div className="hstack" style={{ marginBottom: 12 }}>
-                  <Avatar name={s.name} id={s.id} />
-                  <div className="grow"><div className="title">{s.name}</div><div className="desc">{s.email}</div></div>
+            {mode === 'team' ? (
+              <Card>
+                <div className="hstack" style={{ marginBottom: 12, justifyContent: 'space-between' }}>
+                  <h3>Team score</h3>
+                  <Badge color="blue">{detail.students.length} members</Badge>
                 </div>
                 <div className="vstack">
                   {detail.rubric.criteria.map((c) => {
-                    const cell = scores[`${s.id}:${c.id}`] || {};
+                    const cell = teamScores[c.id] || {};
                     return (
                       <div className="hstack" key={c.id} style={{ gap: 10 }}>
-                        <div style={{ flex: 2 }}>
-                          {c.name} <Badge color="gray">/{c.max_score}</Badge>
-                        </div>
+                        <div style={{ flex: 2 }}>{c.name} <Badge color="gray">/{c.max_score}</Badge></div>
                         <Input style={{ flex: 1 }} type="number" min={0} max={c.max_score} placeholder="Score"
-                          value={cell.score ?? ''} onChange={(e) => setCell(s.id, c.id, 'score', e.target.value)} />
+                          value={cell.score ?? ''} onChange={(e) => setTeamCell(c.id, 'score', e.target.value)} />
                         <Input style={{ flex: 2 }} placeholder="Comment (optional)"
-                          value={cell.comment ?? ''} onChange={(e) => setCell(s.id, c.id, 'comment', e.target.value)} />
+                          value={cell.comment ?? ''} onChange={(e) => setTeamCell(c.id, 'comment', e.target.value)} />
                       </div>
                     );
                   })}
                 </div>
+                <div className="hstack" style={{ marginTop: 12, gap: 6, flexWrap: 'wrap' }}>
+                  {detail.students.map((s) => <Badge key={s.id} color="gray">{s.name}</Badge>)}
+                </div>
               </Card>
-            ))}
-            <Button variant="primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save scores'}</Button>
+            ) : (
+              detail.students.map((s) => (
+                <Card key={s.id}>
+                  <div className="hstack" style={{ marginBottom: 12 }}>
+                    <Avatar name={s.name} id={s.id} />
+                    <div className="grow"><div className="title">{s.name}</div><div className="desc">{s.email}</div></div>
+                  </div>
+                  <div className="vstack">
+                    {detail.rubric.criteria.map((c) => {
+                      const cell = scores[`${s.id}:${c.id}`] || {};
+                      return (
+                        <div className="hstack" key={c.id} style={{ gap: 10 }}>
+                          <div style={{ flex: 2 }}>{c.name} <Badge color="gray">/{c.max_score}</Badge></div>
+                          <Input style={{ flex: 1 }} type="number" min={0} max={c.max_score} placeholder="Score"
+                            value={cell.score ?? ''} onChange={(e) => setCell(s.id, c.id, 'score', e.target.value)} />
+                          <Input style={{ flex: 2 }} placeholder="Comment (optional)"
+                            value={cell.comment ?? ''} onChange={(e) => setCell(s.id, c.id, 'comment', e.target.value)} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              ))
+            )}
+            <Button variant="primary" onClick={save} disabled={busy}>
+              {busy ? 'Saving…' : mode === 'team' ? 'Save team score' : 'Save scores'}
+            </Button>
           </>
         )
       )}

@@ -75,7 +75,7 @@ export default function AdminQuestions() {
       <PageHead
         title="Submissions"
         subtitle="Collect responses from students — choose the input type and who answers"
-        actions={<Button variant="primary" onClick={openNew}>+ New Question</Button>}
+        actions={<Button variant="primary" onClick={openNew}>+ New Submission</Button>}
       />
 
       {questions.length === 0 ? (
@@ -101,7 +101,7 @@ export default function AdminQuestions() {
 
       {creating && (
         <Modal
-          title="New Question"
+          title="New Submission"
           wide
           onClose={() => setCreating(false)}
           footer={<><Button onClick={() => setCreating(false)}>Cancel</Button><Button variant="primary" onClick={save} disabled={busy}>Publish</Button></>}
