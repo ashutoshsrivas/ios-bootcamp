@@ -9,7 +9,7 @@ export default function App({ Component, pageProps }) {
   return (
     <>
       <Head>
-        <title>iOS Bootcamp</title>
+        <title>iOSDC Bootcamp</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
       <PrefsProvider>

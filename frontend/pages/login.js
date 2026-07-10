@@ -33,7 +33,7 @@ export default function Login() {
           <div className="brand-badge" style={{ width: 52, height: 52, margin: '0 auto 16px' }}>
             <span className="brand-dot a" /><span className="brand-dot b" /><span className="brand-dot c" />
           </div>
-          <h1 style={{ fontSize: 27 }}>iOS<span style={{ color: 'var(--accent-text)' }}> Bootcamp</span></h1>
+          <h1 style={{ fontSize: 27 }}>iOSDC<span style={{ color: 'var(--accent-text)' }}> Bootcamp</span></h1>
           <p style={{ color: 'var(--muted)', marginTop: 8, fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase' }}>Sign in to continue</p>
         </div>
         <Card>

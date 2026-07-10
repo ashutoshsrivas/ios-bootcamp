@@ -49,10 +49,10 @@ const NAV = {
 };
 
 const ROLE_TAGLINE = {
-  admin: 'iOS Academy · Admin',
-  mentor: 'iOS Academy · Mentor',
-  volunteer: 'iOS Academy · Volunteer',
-  student: 'iOS Academy · Student',
+  admin: 'iOS Development Centre · Admin',
+  mentor: 'iOS Development Centre · Mentor',
+  volunteer: 'iOS Development Centre · Volunteer',
+  student: 'iOS Development Centre · Student',
 };
 
 const P = {
@@ -122,7 +122,7 @@ export default function Layout({ children }) {
         <div className="sidebar-brand">
           <BrandBadge />
           <div>
-            <div className="brand-name">iOS<span className="accent"> Bootcamp</span></div>
+            <div className="brand-name">iOSDC<span className="accent"> Bootcamp</span></div>
             <div className="tagline">{user ? ROLE_TAGLINE[user.role] : 'Learning Platform'}</div>
           </div>
         </div>
