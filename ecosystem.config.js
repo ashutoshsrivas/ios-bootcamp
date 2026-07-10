@@ -11,9 +11,9 @@ module.exports = {
     {
       name: 'bootcamp-web',
       cwd: './frontend',
-      // `next start` serves the production build on port 3000 (under basePath /bootcamp).
+      // Port 3100 (3000 is used by the existing iosform app). Serves under basePath /bootcamp.
       script: './node_modules/.bin/next',
-      args: 'start -p 3000',
+      args: 'start -p 3100',
       env: { NODE_ENV: 'production' },
       max_restarts: 10,
     },
