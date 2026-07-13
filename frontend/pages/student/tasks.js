@@ -53,6 +53,13 @@ export default function StudentTasks() {
                   Due: {new Date(task.due_date).toLocaleDateString()}
                 </p>
               )}
+              {task.file_url && (
+                <p style={{ marginBottom: 6 }}>
+                  <a href={task.file_url} target="_blank" rel="noreferrer" style={{ fontSize: 14 }}>
+                    📎 Download attachment{task.file_name ? `: ${task.file_name}` : ''}
+                  </a>
+                </p>
+              )}
               {feedbacks.length > 0 && (
                 <div style={{ marginTop: 12, borderTop: '1px solid var(--separator)', paddingTop: 12 }}>
                   <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Mentor Feedback</p>

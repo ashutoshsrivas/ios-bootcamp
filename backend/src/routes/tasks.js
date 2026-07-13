@@ -25,12 +25,12 @@ router.post(
   '/',
   requireRole('admin'),
   ah(async (req, res) => {
-    const { title, description, due_date, bootcamp_id } = req.body || {};
+    const { title, description, due_date, bootcamp_id, file_url, file_name } = req.body || {};
     if (!bootcamp_id) throw new HttpError(400, 'bootcamp_id is required');
     if (!title) throw new HttpError(400, 'Title is required');
     const r = await q(
-      `INSERT INTO tasks (title, description, due_date, bootcamp_id) VALUES (?,?,?,?)`,
-      [title.trim(), description || null, due_date || null, Number(bootcamp_id)]
+      `INSERT INTO tasks (title, description, due_date, bootcamp_id, file_url, file_name) VALUES (?,?,?,?,?,?)`,
+      [title.trim(), description || null, due_date || null, Number(bootcamp_id), file_url || null, file_name || null]
     );
     res.status(201).json({ id: r.insertId });
   })
@@ -41,9 +41,9 @@ router.put(
   '/:id',
   requireRole('admin'),
   ah(async (req, res) => {
-    const { title, description, due_date } = req.body || {};
-    await q(`UPDATE tasks SET title = ?, description = ?, due_date = ? WHERE id = ?`, [
-      title, description || null, due_date || null, Number(req.params.id),
+    const { title, description, due_date, file_url, file_name } = req.body || {};
+    await q(`UPDATE tasks SET title = ?, description = ?, due_date = ?, file_url = ?, file_name = ? WHERE id = ?`, [
+      title, description || null, due_date || null, file_url || null, file_name || null, Number(req.params.id),
     ]);
     res.json({ ok: true });
   })

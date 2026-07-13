@@ -15,6 +15,7 @@ export default function AdminTasks() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({});
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [feedbackFor, setFeedbackFor] = useState(null);
   const [feedback, setFeedback] = useState([]);
 
@@ -27,6 +28,13 @@ export default function AdminTasks() {
     try { await api.post('/api/tasks', { ...form, bootcamp_id: bootcampId }); setCreating(false); setForm({}); await load(); toast.ok('Task created'); }
     catch (e) { toast.err(e.message); }
     setBusy(false);
+  };
+  const onTaskFile = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try { const res = await api.upload(file); setForm((f) => ({ ...f, file_url: res.url, file_name: res.name })); toast.ok('File attached'); }
+    catch (e) { toast.err(e.message); }
+    setUploading(false);
   };
   const remove = async (t) => {
     if (!confirm(`Delete "${t.title}"?`)) return;
@@ -99,6 +107,11 @@ export default function AdminTasks() {
                 {t.due_date && <Badge color="orange">Due {String(t.due_date).slice(0, 10)}</Badge>}
               </div>
               {t.description && <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 6 }}>{t.description}</p>}
+              {t.file_url && (
+                <div style={{ marginTop: 8 }}>
+                  <a href={t.file_url} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>📎 {t.file_name || 'Attachment'}</a>
+                </div>
+              )}
               <div className="hstack" style={{ marginTop: 12 }}>
                 <Button size="sm" onClick={() => openFeedback(t)}>View feedback</Button>
                 <Button size="sm" onClick={() => exportTaskCsv(t)}>⤓ CSV</Button>
@@ -113,11 +126,22 @@ export default function AdminTasks() {
         <Modal
           title="New Task"
           onClose={() => setCreating(false)}
-          footer={<><Button onClick={() => setCreating(false)}>Cancel</Button><Button variant="primary" onClick={save} disabled={busy}>Create</Button></>}
+          footer={<><Button onClick={() => setCreating(false)}>Cancel</Button><Button variant="primary" onClick={save} disabled={busy || uploading}>Create</Button></>}
         >
           <Field label="Title"><Input value={form.title || ''} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
           <Field label="Description"><Textarea value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
           <Field label="Due date"><Input type="date" value={form.due_date || ''} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></Field>
+          <Field label="Attachment (optional) — students can download this">
+            {form.file_url ? (
+              <div className="hstack" style={{ justifyContent: 'space-between' }}>
+                <a href={form.file_url} target="_blank" rel="noreferrer">📎 {form.file_name || 'Attached file'}</a>
+                <Button size="sm" variant="ghost" onClick={() => setForm((f) => ({ ...f, file_url: '', file_name: '' }))}>Remove</Button>
+              </div>
+            ) : (
+              <input type="file" onChange={(e) => onTaskFile(e.target.files?.[0])} />
+            )}
+            {uploading && <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 4 }}>Uploading…</p>}
+          </Field>
         </Modal>
       )}
 

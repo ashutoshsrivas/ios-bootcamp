@@ -62,6 +62,8 @@ async function migrate() {
   await ensureColumn('teams', 'table_id', 'VARCHAR(20) NULL');
   await ensureColumn('roster', 'sort_order', 'INT NULL');
   await ensureColumn('tasks', 'bootcamp_id', 'INT NULL');
+  await ensureColumn('tasks', 'file_url', 'VARCHAR(1024) NULL');
+  await ensureColumn('tasks', 'file_name', 'VARCHAR(255) NULL');
   await ensureColumn('rubrics', 'bootcamp_id', 'INT NULL');
   await ensureColumn('questions', 'bootcamp_id', 'INT NULL');
 }
