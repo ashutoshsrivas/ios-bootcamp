@@ -83,7 +83,7 @@ export default function StudentHome() {
 
   return (
     <Layout>
-      <PageHead title="My Questions" subtitle="Respond to what the organizers have asked" />
+      <PageHead title="My Submissions" subtitle="Respond to what the organizers have asked" />
 
       {questions.length === 0 ? (
         <Card><Empty icon="🎉" title="Nothing to answer" subtitle="You're all caught up." /></Card>

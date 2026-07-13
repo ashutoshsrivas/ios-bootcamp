@@ -42,7 +42,7 @@ const NAV = {
   ],
   student: [
     { section: 'Learning', items: [
-      { href: '/student', label: 'My Questions', icon: 'inbox' },
+      { href: '/student', label: 'My Submissions', icon: 'inbox' },
       { href: '/student/tasks', label: 'Tasks & Feedbacks', icon: 'check' },
     ] },
   ],
