@@ -25,6 +25,7 @@ export default function AdminTeams() {
   const toast = useToast();
   const [teams, setTeams] = useState(null);
   const [pool, setPool] = useState([]);
+  const [approved, setApproved] = useState([]);
   const [mentors, setMentors] = useState([]);
   const [dragId, setDragId] = useState(null);
   const [hover, setHover] = useState(null); // 'pool' | team id
@@ -34,16 +35,18 @@ export default function AdminTeams() {
   const [teamCount, setTeamCount] = useState(4);
   const [reset, setReset] = useState(false);
   const [mentorModal, setMentorModal] = useState(null); // team object
+  const [addModal, setAddModal] = useState(null); // team object — search & add students
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!bootcampId) return;
-    const [t, p, m] = await Promise.all([
+    const [t, p, m, ap] = await Promise.all([
       api.get(scoped('/api/teams', bootcampId)),
       api.get(scoped('/api/students?unassigned=1', bootcampId)),
       api.get('/api/users?role=mentor'),
+      api.get(scoped('/api/students?status=approved', bootcampId)),
     ]);
-    setTeams(t); setPool(p); setMentors(m);
+    setTeams(t); setPool(p); setMentors(m); setApproved(ap);
   }, [bootcampId]);
 
   useEffect(() => { if (ok && bootcampId) load().catch((e) => toast.err(e.message)); }, [ok, load, bootcampId]);
@@ -200,9 +203,13 @@ export default function AdminTeams() {
                 </Select>
               </div>
 
+              <div className="hstack" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+                <span className="kicker">Members</span>
+                <Button size="sm" onClick={() => setAddModal(t)}>+ Add</Button>
+              </div>
               <div style={{ minHeight: 30 }}>
                 {t.members.length === 0
-                  ? <p style={{ color: 'var(--muted)', fontSize: 13 }}>Drop students here</p>
+                  ? <p style={{ color: 'var(--muted)', fontSize: 13 }}>Drop students here, or use + Add</p>
                   : t.members.map((m) => chip(m, t.id))}
               </div>
 
@@ -285,6 +292,15 @@ export default function AdminTeams() {
           onClose={() => setMentorModal(null)}
         />
       )}
+
+      {addModal && (
+        <AddMemberModal
+          team={teams.find((t) => t.id === addModal.id) || addModal}
+          students={approved}
+          onAdd={(studentId) => moveToTeam(studentId, addModal.id)}
+          onClose={() => setAddModal(null)}
+        />
+      )}
     </Layout>
   );
 }
@@ -308,6 +324,51 @@ function TeamRemark({ team, onSave }) {
         </div>
       )}
     </div>
+  );
+}
+
+function AddMemberModal({ team, students, onAdd, onClose }) {
+  const [query, setQuery] = useState('');
+  const term = query.trim().toLowerCase();
+  const list = students
+    .filter((s) => !term || s.name.toLowerCase().includes(term) || (s.email || '').toLowerCase().includes(term))
+    .slice(0, 60);
+  return (
+    <Modal
+      title={`Add students · ${team.name}`}
+      onClose={onClose}
+      footer={<Button variant="primary" onClick={onClose}>Done</Button>}
+    >
+      <Field label="Search approved students">
+        <Input autoFocus placeholder="Name or email…" value={query} onChange={(e) => setQuery(e.target.value)} />
+      </Field>
+      {list.length === 0 ? (
+        <p style={{ color: 'var(--muted)' }}>
+          {students.length === 0 ? 'No approved students in this bootcamp yet.' : 'No approved students match your search.'}
+        </p>
+      ) : (
+        <div className="vstack" style={{ maxHeight: 380, overflowY: 'auto' }}>
+          {list.map((s) => {
+            const onThis = s.team_id === team.id;
+            const onOther = s.team_id && s.team_id !== team.id;
+            return (
+              <div key={s.id} className="row" style={{ borderRadius: 10 }}>
+                <div className="grow">
+                  <div className="title">{s.name}</div>
+                  <div className="desc">{s.email}{onOther ? ` · on ${s.team_name}` : ''}</div>
+                </div>
+                {onThis
+                  ? <Badge color="green">On this team</Badge>
+                  : <Button size="sm" variant={onOther ? 'ghost' : 'primary'} onClick={() => onAdd(s.id)}>{onOther ? 'Move here' : 'Add'}</Button>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {students.length > 60 && !term && (
+        <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>Showing first 60 — type to search the rest.</p>
+      )}
+    </Modal>
   );
 }
 
