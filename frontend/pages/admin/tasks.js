@@ -37,6 +37,42 @@ export default function AdminTasks() {
     try { setFeedback(await api.get(`/api/tasks/${t.id}/feedback`)); } catch (e) { toast.err(e.message); }
   };
 
+  // --- CSV export of mentor task feedback ---
+  const downloadCsv = (filename, rows) => {
+    const esc = (c) => { const s = c == null ? '' : String(c); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const csv = '﻿' + rows.map((r) => r.map(esc).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+  const slug = (s) => (s || 'task').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'task';
+  const HEADER = ['S.No', 'Task', 'Team', 'Mentor', 'Score', 'Feedback'];
+
+  const exportTaskCsv = async (t) => {
+    try {
+      const rows = await api.get(`/api/tasks/${t.id}/feedback`);
+      if (!rows.length) { toast.show('No feedback yet for this task'); return; }
+      const body = rows.map((f, i) => [i + 1, t.title, f.team_name, f.mentor_name, f.score == null ? '' : f.score, f.feedback || '']);
+      downloadCsv(`task-${slug(t.title)}.csv`, [HEADER, ...body]);
+    } catch (e) { toast.err(e.message); }
+  };
+
+  const exportAllCsv = async () => {
+    try {
+      const all = [];
+      let n = 0;
+      for (const t of tasks) {
+        const rows = await api.get(`/api/tasks/${t.id}/feedback`);
+        rows.forEach((f) => { n += 1; all.push([n, t.title, f.team_name, f.mentor_name, f.score == null ? '' : f.score, f.feedback || '']); });
+      }
+      if (!all.length) { toast.show('No feedback recorded yet'); return; }
+      downloadCsv('tasks-feedback.csv', [HEADER, ...all]);
+    } catch (e) { toast.err(e.message); }
+  };
+
   if (!ok || !bootcampId || !tasks) return <Layout><Loading /></Layout>;
 
   return (
@@ -44,7 +80,12 @@ export default function AdminTasks() {
       <PageHead
         title="Task & Feedback"
         subtitle="Assign tasks to teams; mentors record feedback per team"
-        actions={<Button variant="primary" onClick={() => { setForm({}); setCreating(true); }}>+ New Task</Button>}
+        actions={
+          <>
+            {tasks.length > 0 && <Button onClick={exportAllCsv}>⤓ Export all CSV</Button>}
+            <Button variant="primary" onClick={() => { setForm({}); setCreating(true); }}>+ New Task</Button>
+          </>
+        }
       />
 
       {tasks.length === 0 ? (
@@ -60,6 +101,7 @@ export default function AdminTasks() {
               {t.description && <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 6 }}>{t.description}</p>}
               <div className="hstack" style={{ marginTop: 12 }}>
                 <Button size="sm" onClick={() => openFeedback(t)}>View feedback</Button>
+                <Button size="sm" onClick={() => exportTaskCsv(t)}>⤓ CSV</Button>
                 <Button size="sm" variant="ghost" onClick={() => remove(t)}>Delete</Button>
               </div>
             </Card>
