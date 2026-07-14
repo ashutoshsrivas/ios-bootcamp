@@ -221,3 +221,4 @@ router.post(
 );
 
 module.exports = router;
+module.exports.questionApplies = questionApplies;

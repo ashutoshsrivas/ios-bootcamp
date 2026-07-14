@@ -8,7 +8,7 @@ export const HOME_FOR_ROLE = {
   admin: '/admin',
   mentor: '/mentor',
   volunteer: '/volunteer',
-  student: '/student',
+  student: '/student/dashboard',
 };
 
 export function AuthProvider({ children }) {

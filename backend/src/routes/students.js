@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const { q } = require('../db');
 const { authRequired, requireRole } = require('../middleware/auth');
 const { ah, HttpError } = require('../util');
+const { questionApplies } = require('./questions');
 
 const router = express.Router();
 router.use(authRequired);
@@ -43,6 +44,72 @@ async function approveStudent(student, adminId) {
     await q(`UPDATE students SET status='approved', approved_by=? WHERE id=?`, [adminId, student.id]);
   }
 }
+
+// GET /api/students/me/overview  (student) — dashboard: team/SPOC/mentor/table + stats
+router.get(
+  '/me/overview',
+  requireRole('student'),
+  ah(async (req, res) => {
+    const sRows = await q(`SELECT * FROM students WHERE user_id = ? LIMIT 1`, [req.user.id]);
+    const student = sRows[0];
+    if (!student) throw new HttpError(404, 'No student profile linked to this account');
+
+    // Team + SPOC + mentors + table
+    let team = null;
+    if (student.team_id) {
+      const tRows = await q(`SELECT id, name, table_id, spoc_student_id FROM teams WHERE id = ?`, [student.team_id]);
+      if (tRows[0]) {
+        const t = tRows[0];
+        const mentors = await q(
+          `SELECT u.id, u.name, u.email FROM team_mentors tm JOIN users u ON u.id = tm.mentor_id WHERE tm.team_id = ?`,
+          [t.id]
+        );
+        const size = (await q(`SELECT COUNT(*) AS c FROM students WHERE team_id = ?`, [t.id]))[0].c;
+        let spoc = null;
+        if (t.spoc_student_id) {
+          const sp = await q(`SELECT id, name FROM students WHERE id = ?`, [t.spoc_student_id]);
+          spoc = sp[0] || null;
+        }
+        team = {
+          id: t.id, name: t.name, table_id: t.table_id, size,
+          mentors,
+          spoc,
+          isSpoc: t.spoc_student_id === student.id,
+        };
+      }
+    }
+
+    // Task stats (bootcamp-wide tasks; feedback is per team)
+    const tasks = (await q(`SELECT COUNT(*) AS c FROM tasks WHERE bootcamp_id = ?`, [student.bootcamp_id]))[0].c;
+    const feedbackReceived = student.team_id
+      ? (await q(`SELECT COUNT(DISTINCT task_id) AS c FROM task_feedback WHERE team_id = ?`, [student.team_id]))[0].c
+      : 0;
+
+    // Submission stats — reuse the exact audience-targeting logic
+    const questions = await q(`SELECT * FROM questions WHERE bootcamp_id = ?`, [student.bootcamp_id]);
+    const targets = await q(`SELECT * FROM question_targets`);
+    const spocTeamIds = (await q(`SELECT id FROM teams WHERE spoc_student_id = ?`, [student.id])).map((r) => r.id);
+    const answers = await q(`SELECT question_id, value_text, value_number, file_url FROM answers WHERE student_id = ?`, [student.id]);
+    const answeredIds = new Set(
+      answers.filter((a) => a.value_text || a.value_number != null || a.file_url).map((a) => a.question_id)
+    );
+    const applicable = questions.filter((qq) => questionApplies(qq, targets, student, spocTeamIds));
+    const submissionsTotal = applicable.length;
+    const submissionsAnswered = applicable.filter((qq) => answeredIds.has(qq.id)).length;
+
+    res.json({
+      student: { name: student.name, email: student.email, team_id: student.team_id },
+      team,
+      stats: {
+        tasks,
+        feedbackReceived,
+        submissionsTotal,
+        submissionsAnswered,
+        submissionsPending: submissionsTotal - submissionsAnswered,
+      },
+    });
+  })
+);
 
 // GET /api/students?bootcamp=&status=&team=&unassigned=1  (admin + mentor + volunteer)
 router.get(
