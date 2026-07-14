@@ -46,6 +46,13 @@ export const api = {
     form.append('file', file);
     return request(path, { method: 'POST', body: form, isForm: true });
   },
+  // Upload a chat file (<=100MB) with an optional caption; broadcast happens server-side.
+  chatUpload: async (teamId, file, caption) => {
+    const form = new FormData();
+    form.append('file', file);
+    if (caption) form.append('caption', caption);
+    return request(`/api/chat/${teamId}/upload`, { method: 'POST', body: form, isForm: true });
+  },
   // Fetch a binary response (with auth) and trigger a browser download.
   downloadFile: async (path, filename) => {
     const token = getToken();
@@ -64,5 +71,14 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 };
+
+// Build a ws(s):// URL against the API origin, appending the auth token.
+// e.g. wsUrl('/api/ws', '&team=3') → wss://host/bootcamp/api/ws?token=…&team=3
+export function wsUrl(path, extra = '') {
+  let base = BASE;
+  if (!/^https?:/i.test(base) && typeof window !== 'undefined') base = window.location.origin + base;
+  const token = getToken() || '';
+  return `${base.replace(/^http/i, 'ws')}${path}?token=${encodeURIComponent(token)}${extra}`;
+}
 
 export { BASE };

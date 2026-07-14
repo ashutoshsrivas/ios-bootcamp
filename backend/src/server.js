@@ -1,3 +1,4 @@
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const config = require('./config');
@@ -32,6 +33,7 @@ async function main() {
   app.use('/api/questions', require('./routes/questions'));
   app.use('/api/reports', require('./routes/reports'));
   app.use('/api/uploads', require('./routes/uploads'));
+  app.use('/api/chat', require('./routes/chat'));
 
   // 404
   app.use((req, res) => res.status(404).json({ error: 'Not found' }));
@@ -44,7 +46,13 @@ async function main() {
     res.status(status).json({ error: err.message || 'Server error' });
   });
 
-  app.listen(config.port, () => {
+  const server = http.createServer(app);
+
+  // Attach the team-chat WebSocket hub and start the 30-day file cleanup.
+  require('./chatHub').attach(server);
+  require('./chatCleanup').start(require('./routes/chat').CHAT_DIR);
+
+  server.listen(config.port, () => {
     // eslint-disable-next-line no-console
     console.log(`API listening on http://localhost:${config.port}`);
   });

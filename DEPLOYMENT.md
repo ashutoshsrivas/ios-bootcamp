@@ -14,6 +14,10 @@ Browser ──► Apache (443, iosdc.geu.ac.in)   [also serves /apply/cohort2026
 - Frontend build is configured by `frontend/.env.production`
   (`NEXT_PUBLIC_BASE_PATH=/bootcamp`, `NEXT_PUBLIC_API_BASE=https://iosdc.geu.ac.in/bootcamp`).
 - The API auto-creates its MySQL database + tables and seeds the admin on first boot.
+- **Team chat** uses a WebSocket at `/bootcamp/api/ws` (needs Apache `mod_proxy_wstunnel`,
+  enabled with `sudo a2enmod proxy_wstunnel`). Chat file uploads are stored on **local disk**
+  at `CHAT_UPLOAD_DIR` (set it in `backend/.env`, e.g. `/home/ubuntu/bootcamp-chat-uploads`)
+  — NOT S3 — so they stay team-private and can be auto-deleted after 30 days.
 
 ---
 

@@ -26,6 +26,7 @@ const NAV = {
     ] },
     { section: 'People', items: [
       { href: '/admin/users', label: 'Users', icon: 'person' },
+      { href: '/admin/chat', label: 'Chat Monitor', icon: 'chat' },
     ] },
   ],
   mentor: [
@@ -45,6 +46,7 @@ const NAV = {
       { href: '/student/dashboard', label: 'Dashboard', icon: 'grid' },
       { href: '/student', label: 'My Submissions', icon: 'inbox' },
       { href: '/student/tasks', label: 'Tasks & Feedbacks', icon: 'check' },
+      { href: '/student/chat', label: 'Team Chat', icon: 'chat' },
     ] },
   ],
 };

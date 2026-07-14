@@ -171,3 +171,20 @@ CREATE TABLE IF NOT EXISTS answers (
   CONSTRAINT fk_ans_question FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE,
   CONSTRAINT fk_ans_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Per-team chat. Files live on local disk (file_path) and are removed after 30 days
+-- (file_expired flips to 1). Isolation is enforced in code by team_id.
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  team_id INT NOT NULL,
+  sender_student_id INT NOT NULL,
+  body TEXT NULL,
+  file_name VARCHAR(255) NULL,
+  file_path VARCHAR(255) NULL,
+  file_size BIGINT NULL,
+  file_expired TINYINT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_chat_team (team_id, id),
+  CONSTRAINT fk_chat_team FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+  CONSTRAINT fk_chat_sender FOREIGN KEY (sender_student_id) REFERENCES students(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
