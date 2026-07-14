@@ -10,6 +10,7 @@ export default function StudentDashboard() {
   const router = useRouter();
   const toast = useToast();
   const [data, setData] = useState(null);
+  const [showMembers, setShowMembers] = useState(false);
 
   useEffect(() => {
     if (!ok) return;
@@ -56,9 +57,31 @@ export default function StudentDashboard() {
             <h3>{team.name}</h3>
             <div className="hstack" style={{ gap: 6 }}>
               {team.table_id && <Badge color="orange">Table {team.table_id}</Badge>}
-              <Badge color="gray">{team.size} member{team.size === 1 ? '' : 's'}</Badge>
+              <button
+                type="button"
+                onClick={() => setShowMembers((v) => !v)}
+                title="Show team members"
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+              >
+                <Badge color="gray">{team.size} member{team.size === 1 ? '' : 's'} {showMembers ? '▲' : '▾'}</Badge>
+              </button>
             </div>
           </div>
+
+          {showMembers && (
+            <div style={{ marginBottom: 14, borderBottom: '1px solid var(--separator)', paddingBottom: 14 }}>
+              <div className="kicker" style={{ marginBottom: 8 }}>Team members</div>
+              <div className="vstack" style={{ gap: 6 }}>
+                {team.members.map((m) => (
+                  <div key={m.id} className="hstack" style={{ gap: 8 }}>
+                    <span style={{ fontSize: 15 }}>{m.name}</span>
+                    {m.is_you && <Badge color="blue">You</Badge>}
+                    {m.is_spoc && <Badge color="orange">SPOC</Badge>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid cols-3" style={{ gap: 12 }}>
             <div>

@@ -64,15 +64,21 @@ router.get(
           `SELECT u.id, u.name, u.email FROM team_mentors tm JOIN users u ON u.id = tm.mentor_id WHERE tm.team_id = ?`,
           [t.id]
         );
-        const size = (await q(`SELECT COUNT(*) AS c FROM students WHERE team_id = ?`, [t.id]))[0].c;
+        const memberRows = await q(`SELECT id, name, email FROM students WHERE team_id = ? ORDER BY name`, [t.id]);
+        const members = memberRows.map((m) => ({
+          ...m,
+          is_you: m.id === student.id,
+          is_spoc: m.id === t.spoc_student_id,
+        }));
         let spoc = null;
         if (t.spoc_student_id) {
           const sp = await q(`SELECT id, name FROM students WHERE id = ?`, [t.spoc_student_id]);
           spoc = sp[0] || null;
         }
         team = {
-          id: t.id, name: t.name, table_id: t.table_id, size,
+          id: t.id, name: t.name, table_id: t.table_id, size: members.length,
           mentors,
+          members,
           spoc,
           isSpoc: t.spoc_student_id === student.id,
         };
