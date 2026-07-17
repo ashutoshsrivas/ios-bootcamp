@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRequireRole } from '../../lib/auth';
 import { useBootcamp, scoped } from '../../lib/bootcamp';
 import { api } from '../../lib/api';
+import { downloadCsv } from '../../lib/csv';
 import Layout, { PageHead } from '../../components/Layout';
 import {
   Card, Button, Loading, useToast, Badge, Modal, Field, Input, Select, Empty, Textarea, Switch,
@@ -124,6 +125,28 @@ export default function AdminTeams() {
   const baseSeq = tableIdSequence(50);
   const tableOptions = [...baseSeq, ...teams.map((t) => t.table_id).filter((id) => id && !baseSeq.includes(id))];
 
+  // One row per member; empty teams still get a row so the sheet shows every team.
+  const exportCsv = () => {
+    if (!teams.length) { toast.show('No teams to export'); return; }
+    const header = ['S.No', 'Team', 'Table', 'Member', 'Email', 'Role', 'Mentors', 'Remark'];
+    const rows = [];
+    let n = 0;
+    teams.forEach((t) => {
+      const mentorNames = t.mentors.map((m) => m.name).join('; ');
+      if (t.members.length === 0) {
+        rows.push([++n, t.name, t.table_id || '', '', '', '', mentorNames, t.remarks || '']);
+      } else {
+        t.members.forEach((m) => {
+          rows.push([
+            ++n, t.name, t.table_id || '', m.name, m.email || '',
+            t.spoc_student_id === m.id ? 'SPOC' : 'Member', mentorNames, t.remarks || '',
+          ]);
+        });
+      }
+    });
+    downloadCsv('teams.csv', [header, ...rows]);
+  };
+
   const chip = (s, teamId) => (
     <div
       key={s.id}
@@ -144,6 +167,7 @@ export default function AdminTeams() {
         subtitle="Auto-build teams, then drag students between them"
         actions={
           <>
+            {teams.length > 0 && <Button onClick={exportCsv}>⤓ Export CSV</Button>}
             {teams.length > 0 && <Button onClick={assignTables}>⤵ Assign tables</Button>}
             <Button onClick={addTeam}>+ New Team</Button>
             <Button variant="primary" onClick={() => setAutoOpen(true)}>Auto-create Teams</Button>

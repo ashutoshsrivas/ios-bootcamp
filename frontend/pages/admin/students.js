@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRequireRole } from '../../lib/auth';
 import { useBootcamp, scoped } from '../../lib/bootcamp';
 import { api } from '../../lib/api';
+import { downloadCsv } from '../../lib/csv';
 import Layout, { PageHead } from '../../components/Layout';
 import RosterSearch from '../../components/RosterSearch';
 import {
@@ -82,6 +83,19 @@ export default function AdminStudents() {
 
   const filtered = students.filter((s) => filter === 'all' || s.status === filter);
 
+  // Exports whatever the current filter shows.
+  const exportCsv = () => {
+    if (!filtered.length) { toast.show('Nothing to export'); return; }
+    const header = ['S.No', 'Name', 'Email', 'Phone', 'Roll No', 'College', 'Branch', 'Year',
+      'Status', 'Team', 'Registered by', 'Approved by', 'Registered on'];
+    const rows = filtered.map((s, i) => [
+      i + 1, s.name, s.email, s.phone || '', s.roll_no || '', s.college || '', s.branch || '',
+      s.year || '', s.status, s.team_name || '', s.registered_by_name || '', s.approved_by_name || '',
+      s.created_at ? String(s.created_at).slice(0, 10) : '',
+    ]);
+    downloadCsv(`registrations-${filter}.csv`, [header, ...rows]);
+  };
+
   return (
     <Layout>
       <PageHead
@@ -89,6 +103,7 @@ export default function AdminStudents() {
         subtitle="Review and approve students registered by volunteers"
         actions={
           <>
+            {students.length > 0 && <Button onClick={exportCsv}>⤓ Export CSV</Button>}
             {students.some((s) => s.status === 'pending') && (
               <Button variant="success" onClick={approveAll}>✓ Approve all</Button>
             )}
