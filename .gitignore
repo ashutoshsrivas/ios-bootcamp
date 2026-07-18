@@ -20,5 +20,7 @@ npm-debug.log*
 
 # Locally-stored team chat uploads (auto-expire after 30 days)
 backend/chat-uploads/
+# Certificate template background images (served same-origin)
+backend/cert-uploads/
 
 # Dependencies are handled by package-specific .gitignore files

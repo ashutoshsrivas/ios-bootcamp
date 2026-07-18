@@ -23,6 +23,7 @@ const NAV = {
       { href: '/admin/tasks', label: 'Task & Feedback', icon: 'check' },
       { href: '/admin/questions', label: 'Submissions', icon: 'chat' },
       { href: '/admin/reports', label: 'Result & remarks', icon: 'chart' },
+      { href: '/admin/certificates', label: 'Certificates', icon: 'award' },
     ] },
     { section: 'People', items: [
       { href: '/admin/users', label: 'Users', icon: 'person' },
@@ -47,6 +48,7 @@ const NAV = {
       { href: '/student', label: 'My Submissions', icon: 'inbox' },
       { href: '/student/tasks', label: 'Tasks & Feedbacks', icon: 'check' },
       { href: '/student/chat', label: 'Team Chat', icon: 'chat' },
+      { href: '/student/certificate', label: 'My Certificate', icon: 'award' },
     ] },
   ],
 };
@@ -72,6 +74,7 @@ const P = {
   layers: 'M12 3l9 5-9 5-9-5 9-5ZM3 13l9 5 9-5M3 17l9 5 9-5',
   book: 'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5ZM19 3v16M8 7h7M8 11h7',
   chart: 'M3 3v18h18M8 17V10M13 17V6M18 17v-4',
+  award: 'M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12ZM8.5 13.5 7 22l5-3 5 3-1.5-8.5',
 };
 
 function Icon({ name }) {

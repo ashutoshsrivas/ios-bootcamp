@@ -172,6 +172,32 @@ CREATE TABLE IF NOT EXISTS answers (
   CONSTRAINT fk_ans_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Certificate templates: a background image (local disk) + positioned dynamic fields.
+CREATE TABLE IF NOT EXISTS certificate_templates (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(190) NOT NULL,
+  background_path VARCHAR(255) NOT NULL,
+  width INT NULL,
+  height INT NULL,
+  fields JSON NULL,
+  is_default TINYINT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Issued certificates: one per (student, template); values_json snapshots the field values.
+CREATE TABLE IF NOT EXISTS certificates (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  student_id INT NOT NULL,
+  template_id INT NOT NULL,
+  bootcamp_id INT NULL,
+  serial VARCHAR(60) NULL,
+  values_json JSON NULL,
+  issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_cert (student_id, template_id),
+  CONSTRAINT fk_cert_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+  CONSTRAINT fk_cert_template FOREIGN KEY (template_id) REFERENCES certificate_templates(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Per-team chat. Files live on local disk (file_path) and are removed after 30 days
 -- (file_expired flips to 1). Isolation is enforced in code by team_id.
 CREATE TABLE IF NOT EXISTS chat_messages (

@@ -34,6 +34,7 @@ async function main() {
   app.use('/api/reports', require('./routes/reports'));
   app.use('/api/uploads', require('./routes/uploads'));
   app.use('/api/chat', require('./routes/chat'));
+  app.use('/api/certificates', require('./routes/certificates'));
 
   // 404
   app.use((req, res) => res.status(404).json({ error: 'Not found' }));
