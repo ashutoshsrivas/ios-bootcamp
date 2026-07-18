@@ -363,7 +363,7 @@ function TemplateEditor({ initial, toast, onClose, onSaved }) {
                   <div {...common} style={{
                     position: 'absolute', left: `${fld.x}%`, top: `${fld.y}%`,
                     transform: 'translate(-50%, -50%)', width: side, height: side,
-                    display: 'grid', placeItems: 'center', cursor: 'move',
+                    display: 'grid', placeItems: 'center', cursor: 'move', touchAction: 'none',
                     background: '#fff', color: '#000', fontSize: Math.max(9, side * 0.18),
                     border: `1px solid ${fld.color || '#000'}`,
                     outline: i === sel ? '2px dashed var(--accent)' : '1px dashed rgba(0,0,0,0.25)',
@@ -379,7 +379,7 @@ function TemplateEditor({ initial, toast, onClose, onSaved }) {
                   fontWeight: fld.bold ? 700 : 400,
                   fontFamily: fld.fontFamily || 'Helvetica, Arial, sans-serif',
                   color: fld.color || '#111',
-                  whiteSpace: 'nowrap', cursor: 'move', padding: '0 2px',
+                  whiteSpace: 'nowrap', cursor: 'move', padding: '0 2px', touchAction: 'none',
                   outline: i === sel ? '2px dashed var(--accent)' : '1px dashed rgba(0,0,0,0.25)',
                 }}>
                   {SAMPLE[fld.key] ?? fld.label}

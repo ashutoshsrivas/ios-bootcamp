@@ -97,9 +97,9 @@
   --shadow-lg: 0 24px 60px rgba(20, 30, 60, 0.18);
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-html { background: var(--bg); }
+html { background: var(--bg); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   margin: 0; padding: 0;
   color: var(--text);
@@ -484,27 +484,72 @@ table.tbl.matrix td { text-align: left; font-variant-numeric: tabular-nums; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .center-load { display: grid; place-items: center; padding: 80px; }
 
+@keyframes sheet-up { from { transform: translateY(100%); } }
+
 @media (max-width: 860px) {
   .topbar {
     display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 45;
-    padding: 12px 16px; background: var(--surface); backdrop-filter: blur(16px);
+    padding: 12px 16px; padding-top: calc(12px + env(safe-area-inset-top));
+    padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right));
+    background: var(--surface); backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--border-soft);
   }
   .topbar .brand-badge { width: 34px; height: 34px; }
-  .topbar .wordmark { font-weight: 700; font-size: 16px; color: #fff; }
-  .hamburger { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border); background: var(--btn-bg); color: var(--text); display: grid; place-items: center; cursor: pointer; }
+  .topbar .wordmark { font-weight: 700; font-size: 16px; color: var(--text); }
+  .hamburger { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border); background: var(--btn-bg); color: var(--text); display: grid; place-items: center; cursor: pointer; }
 
   .app-shell { flex-direction: column; }
   .sidebar {
-    position: fixed; top: 0; left: 0; height: 100vh; transform: translateX(-105%);
+    position: fixed; top: 0; left: 0; height: 100dvh; width: min(86vw, 320px); transform: translateX(-105%);
+    padding-top: calc(22px + env(safe-area-inset-top));
+    padding-left: calc(16px + env(safe-area-inset-left));
     background: var(--surface); transition: transform 0.3s cubic-bezier(0.2,0.8,0.2,1); box-shadow: var(--shadow-lg);
   }
   .sidebar.open { transform: translateX(0); }
   .drawer-backdrop { display: block; position: fixed; inset: 0; z-index: 39; background: rgba(0,0,0,0.6); animation: fade 0.2s ease; }
-  .main { max-height: none; overflow: visible; }
-  .content { padding: 22px 16px 90px; }
-  h1 { font-size: 26px; }
+  .main { max-height: none; overflow-x: hidden; }
+  .content {
+    padding: 20px 16px calc(40px + env(safe-area-inset-bottom));
+    padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right));
+  }
+  h1 { font-size: 25px; }
+  .page-head { margin-bottom: 20px; }
+  .crumbs { margin-bottom: 12px; }
+  .card { padding: 18px; border-radius: 14px; }
   .row-fields { grid-template-columns: 1fr; }
+
+  /* Stat/tile grids: 2-up; content grids: single column */
+  .grid.cols-2 { grid-template-columns: 1fr; }
+  .grid.cols-3, .grid.cols-4 { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+
+  /* Prevent iOS zoom-on-focus (needs ≥16px) */
+  .input, .select, textarea.input, .ac-input input { font-size: 16px; }
+
+  /* Comfortable touch targets */
+  .btn { min-height: 44px; padding: 11px 16px; }
+  .btn.sm { min-height: 36px; padding: 8px 12px; font-size: 13px; }
+  .btn.block { min-height: 48px; }
+  .nav-item { padding: 12px 12px; font-size: 15px; }
+  input[type="checkbox"] { width: 20px; height: 20px; }
+
+  /* Segmented → native scrollable tab bar */
+  .segmented { display: flex; width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .segmented::-webkit-scrollbar { display: none; }
+  .segmented button { flex: 1 0 auto; white-space: nowrap; padding: 10px 16px; font-size: 13px; }
+
+  /* Modals become bottom sheets */
+  .modal-backdrop { padding: 0; align-items: flex-end; }
+  .modal {
+    max-width: 100%; width: 100%; max-height: 92dvh;
+    border-radius: 18px 18px 0 0; border-bottom: none;
+    animation: sheet-up 0.28s cubic-bezier(0.2,0.85,0.2,1);
+  }
+  .modal-body { padding: 18px; }
+  .modal-foot { padding: 14px 18px calc(14px + env(safe-area-inset-bottom)); }
+  .modal-foot .btn { flex: 1; }
+
+  /* Chat fills the visible viewport height */
+  .chat-wrap { height: calc(100dvh - 210px); }
 }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
