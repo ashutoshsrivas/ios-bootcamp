@@ -38,7 +38,7 @@ router.get('/bg/:file', (req, res) => {
 router.get('/verify/:code', ah(async (req, res) => {
   const code = String(req.params.code || '').trim();
   const c = code && (await q(
-    `SELECT c.serial, c.issued_at, c.values_json, s.name AS student_name,
+    `SELECT c.serial, c.issued_at, c.revoked, c.values_json, s.name AS student_name,
             ct.name AS program, b.name AS bootcamp_name
      FROM certificates c
      JOIN students s ON s.id = c.student_id
@@ -50,7 +50,8 @@ router.get('/verify/:code', ah(async (req, res) => {
   if (!c) throw new HttpError(404, 'No certificate matches this code');
   const values = parseJson(c.values_json, {});
   res.json({
-    valid: true,
+    valid: !c.revoked,
+    revoked: !!c.revoked,
     name: c.student_name,
     program: c.program,
     bootcamp: c.bootcamp_name || null,
@@ -159,7 +160,7 @@ router.get('/', requireRole('admin'), ah(async (req, res) => {
   if (req.query.bootcamp) { where.push('c.bootcamp_id = ?'); params.push(Number(req.query.bootcamp)); }
   if (req.query.template) { where.push('c.template_id = ?'); params.push(Number(req.query.template)); }
   const rows = await q(
-    `SELECT c.id, c.student_id, c.template_id, c.serial, c.verify_code, c.values_json, c.issued_at,
+    `SELECT c.id, c.student_id, c.template_id, c.serial, c.verify_code, c.revoked, c.values_json, c.issued_at,
             s.name AS student_name, s.email AS student_email, ct.name AS template_name
      FROM certificates c
      JOIN students s ON s.id = c.student_id
@@ -174,7 +175,7 @@ router.get('/', requireRole('admin'), ah(async (req, res) => {
 // GET /api/certificates/mine  (student) — their certificates + templates for rendering
 router.get('/mine', requireRole('student'), ah(async (req, res) => {
   const rows = await q(
-    `SELECT c.id, c.serial, c.verify_code, c.values_json, c.issued_at, ct.*
+    `SELECT c.id, c.serial, c.verify_code, c.revoked, c.values_json, c.issued_at, ct.*
      FROM certificates c
      JOIN students s ON s.id = c.student_id
      JOIN certificate_templates ct ON ct.id = c.template_id
@@ -183,7 +184,7 @@ router.get('/mine', requireRole('student'), ah(async (req, res) => {
     [req.user.id]
   );
   res.json(rows.map((r) => ({
-    id: r.id, serial: r.serial, verify_code: r.verify_code, issued_at: r.issued_at,
+    id: r.id, serial: r.serial, verify_code: r.verify_code, revoked: !!r.revoked, issued_at: r.issued_at,
     values: parseJson(r.values_json, {}),
     template: templateOut(r),
   })));
@@ -206,6 +207,13 @@ router.get('/:id', ah(async (req, res) => {
     values: parseJson(c.values_json, {}),
     template: templateOut({ id: c.template_id, name: c.ct_name, background_path: c.background_path, width: c.width, height: c.height, fields: c.fields, is_default: c.is_default, created_at: c.ct_created }),
   });
+}));
+
+// POST /api/certificates/:id/revoke  { revoked }  (admin) — toggle validity, keep the record
+router.post('/:id/revoke', requireRole('admin'), ah(async (req, res) => {
+  const revoked = req.body?.revoked === false ? 0 : 1;
+  await q('UPDATE certificates SET revoked = ? WHERE id = ?', [revoked, Number(req.params.id)]);
+  res.json({ ok: true, revoked: !!revoked });
 }));
 
 router.delete('/:id', requireRole('admin'), ah(async (req, res) => {

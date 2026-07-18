@@ -127,6 +127,25 @@ function IssuePanel({ templates, bootcampId, toast, onNeedTemplate }) {
     } catch (e) { toast.err(e.message); }
   };
 
+  const toggleRevoke = async (cert) => {
+    const revoking = !cert.revoked;
+    if (revoking && !confirm(`Revoke ${cert.student_name}'s certificate? Its verification page will show it as revoked (the record is kept).`)) return;
+    try {
+      await api.post(`/api/certificates/${cert.id}/revoke`, { revoked: revoking });
+      toast.ok(revoking ? 'Certificate revoked' : 'Certificate reinstated');
+      loadIssued();
+    } catch (e) { toast.err(e.message); }
+  };
+
+  const removeCert = async (cert) => {
+    if (!confirm(`Delete ${cert.student_name}'s certificate permanently? This cannot be undone and its verify link will stop working.`)) return;
+    try {
+      await api.del(`/api/certificates/${cert.id}`);
+      toast.show('Certificate deleted');
+      loadIssued();
+    } catch (e) { toast.err(e.message); }
+  };
+
   if (!templates.length) {
     return <Card><Empty icon="📜" title="No template yet" subtitle="Create a certificate template first." /><div style={{ textAlign: 'center' }}><Button variant="primary" onClick={onNeedTemplate}>Go to Templates</Button></div></Card>;
   }
@@ -183,12 +202,14 @@ function IssuePanel({ templates, bootcampId, toast, onNeedTemplate }) {
               {issued.map((c) => (
                 <div className="row" key={c.id} style={{ borderRadius: 8 }}>
                   <div className="grow">
-                    <div className="title truncate">{c.student_name}</div>
+                    <div className="title truncate">{c.student_name} {c.revoked ? <Badge color="red">revoked</Badge> : null}</div>
                     <div className="desc">{c.serial || '—'} · {c.issued_at ? String(c.issued_at).slice(0, 10) : ''}</div>
                   </div>
                   <div className="hstack">
                     <Button size="sm" onClick={() => setViewing(c)}>View</Button>
                     <Button size="sm" variant="ghost" onClick={() => download(c)}>⤓ PNG</Button>
+                    <Button size="sm" variant={c.revoked ? 'success' : 'ghost'} onClick={() => toggleRevoke(c)}>{c.revoked ? 'Reinstate' : 'Revoke'}</Button>
+                    <Button size="sm" variant="danger" onClick={() => removeCert(c)}>Delete</Button>
                   </div>
                 </div>
               ))}

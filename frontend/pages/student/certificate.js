@@ -33,10 +33,12 @@ export default function StudentCertificate() {
         certs.map((c) => (
           <Card key={c.id}>
             <div className="hstack" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
-              <h3>{c.template?.name || 'Certificate'} {c.serial && <Badge color="gray">{c.serial}</Badge>}</h3>
-              <Button variant="primary" onClick={() => download(c)}>⤓ Download PNG</Button>
+              <h3>{c.template?.name || 'Certificate'} {c.serial && <Badge color="gray">{c.serial}</Badge>} {c.revoked && <Badge color="red">revoked</Badge>}</h3>
+              {!c.revoked && <Button variant="primary" onClick={() => download(c)}>⤓ Download PNG</Button>}
             </div>
-            <CertificatePreview template={c.template} values={certValues(c)} />
+            {c.revoked
+              ? <p style={{ color: 'var(--muted)' }}>This certificate has been revoked and is no longer available for download.</p>
+              : <CertificatePreview template={c.template} values={certValues(c)} />}
           </Card>
         ))
       )}

@@ -41,6 +41,16 @@ export default function VerifyCertificate() {
           </div>
         )}
 
+        {!loading && data && data.revoked && (
+          <div style={{ padding: '20px 0' }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--red-tint)', color: 'var(--red)', display: 'grid', placeItems: 'center', fontSize: 34, margin: '8px auto 12px' }}>⦸</div>
+            <h2 style={{ color: 'var(--red)' }}>Certificate revoked</h2>
+            <p style={{ color: 'var(--muted)', marginTop: 8 }}>
+              This certificate{data.name ? ` (issued to ${data.name})` : ''} has been revoked by the iOS Development Centre and is no longer valid.
+            </p>
+          </div>
+        )}
+
         {!loading && data?.valid && (
           <div>
             <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--green-tint)', color: 'var(--green)', display: 'grid', placeItems: 'center', fontSize: 34, margin: '8px auto 12px' }}>✓</div>

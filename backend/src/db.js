@@ -67,6 +67,7 @@ async function migrate() {
   await ensureColumn('rubrics', 'bootcamp_id', 'INT NULL');
   await ensureColumn('questions', 'bootcamp_id', 'INT NULL');
   await ensureColumn('certificates', 'verify_code', 'VARCHAR(40) NULL');
+  await ensureColumn('certificates', 'revoked', 'TINYINT NOT NULL DEFAULT 0');
 }
 
 async function seedDefaults() {

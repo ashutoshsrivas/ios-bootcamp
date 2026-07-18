@@ -192,6 +192,7 @@ CREATE TABLE IF NOT EXISTS certificates (
   bootcamp_id INT NULL,
   serial VARCHAR(60) NULL,
   verify_code VARCHAR(40) NULL,
+  revoked TINYINT NOT NULL DEFAULT 0,
   values_json JSON NULL,
   issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_cert (student_id, template_id),
