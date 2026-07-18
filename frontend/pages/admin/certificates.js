@@ -200,12 +200,10 @@ function IssuePanel({ templates, bootcampId, toast, onNeedTemplate }) {
           ) : (
             <div className="vstack" style={{ maxHeight: 420, overflowY: 'auto', gap: 2 }}>
               {issued.map((c) => (
-                <div className="row" key={c.id} style={{ borderRadius: 8 }}>
-                  <div className="grow">
-                    <div className="title truncate">{c.student_name} {c.revoked ? <Badge color="red">revoked</Badge> : null}</div>
-                    <div className="desc">{c.serial || '—'} · {c.issued_at ? String(c.issued_at).slice(0, 10) : ''}</div>
-                  </div>
-                  <div className="hstack">
+                <div key={c.id} style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-soft)' }}>
+                  <div className="title truncate">{c.student_name} {c.revoked ? <Badge color="red">revoked</Badge> : null}</div>
+                  <div className="desc truncate">{c.serial || '—'} · {c.issued_at ? String(c.issued_at).slice(0, 10) : ''}</div>
+                  <div className="hstack" style={{ marginTop: 8, flexWrap: 'wrap', gap: 6 }}>
                     <Button size="sm" onClick={() => setViewing(c)}>View</Button>
                     <Button size="sm" variant="ghost" onClick={() => download(c)}>⤓ PNG</Button>
                     <Button size="sm" variant={c.revoked ? 'success' : 'ghost'} onClick={() => toggleRevoke(c)}>{c.revoked ? 'Reinstate' : 'Revoke'}</Button>
