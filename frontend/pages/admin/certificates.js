@@ -7,11 +7,12 @@ import {
   Card, Button, Loading, useToast, Badge, Modal, Field, Input, Select, Segmented, Empty, Switch,
 } from '../../components/UI';
 import {
-  bgUrl, SAMPLE, certValues, CertificatePreview, renderCertificatePng, downloadDataUrl,
+  bgUrl, SAMPLE, sampleValues, certValues, CertificatePreview, renderCertificatePng, downloadDataUrl,
 } from '../../components/Certificate';
 
-const AUTO_KEYS = ['name', 'serial', 'issued_on'];
+const AUTO_KEYS = ['name', 'serial', 'issued_on', 'verify_url'];
 const newField = () => ({ key: 'field', label: 'New field', x: 50, y: 50, size: 5, color: '#111111', align: 'center', bold: true, fontFamily: 'Helvetica, Arial, sans-serif' });
+const newQr = () => ({ type: 'qr', key: 'verify_url', label: 'Verify QR', x: 86, y: 82, size: 15, color: '#000000' });
 const seedFields = () => ([
   { key: 'name', label: 'Student Name', x: 50, y: 52, size: 6, color: '#111111', align: 'center', bold: true, fontFamily: 'Helvetica, Arial, sans-serif' },
   { key: 'date', label: 'Date', x: 50, y: 30, size: 2.6, color: '#111111', align: 'center', bold: false, fontFamily: 'Helvetica, Arial, sans-serif' },
@@ -284,6 +285,10 @@ function TemplateEditor({ initial, toast, onClose, onSaved }) {
 
   const patch = (i, p) => setFields((fs) => fs.map((f, idx) => (idx === i ? { ...f, ...p } : f)));
   const addField = () => { setFields((fs) => [...fs, newField()]); setSel(fields.length); };
+  const addQr = () => {
+    if (fields.some((x) => x.type === 'qr')) { toast.show('A QR field already exists'); return; }
+    setFields((fs) => [...fs, newQr()]); setSel(fields.length);
+  };
   const removeField = (i) => { setFields((fs) => fs.filter((_, idx) => idx !== i)); setSel(0); };
 
   const save = async () => {
@@ -328,24 +333,36 @@ function TemplateEditor({ initial, toast, onClose, onSaved }) {
               style={{ width: '100%', display: 'block', borderRadius: 8, border: '1px solid var(--border)' }}
             />
             {fields.map((fld, i) => {
+              const common = {
+                key: i,
+                onPointerDown: (e) => { e.preventDefault(); setSel(i); setDrag(i); },
+                title: fld.label,
+              };
+              if (fld.type === 'qr') {
+                const side = ((Number(fld.size) || 15) / 100) * (disp.h || 700);
+                return (
+                  <div {...common} style={{
+                    position: 'absolute', left: `${fld.x}%`, top: `${fld.y}%`,
+                    transform: 'translate(-50%, -50%)', width: side, height: side,
+                    display: 'grid', placeItems: 'center', cursor: 'move',
+                    background: '#fff', color: '#000', fontSize: Math.max(9, side * 0.18),
+                    border: `1px solid ${fld.color || '#000'}`,
+                    outline: i === sel ? '2px dashed var(--accent)' : '1px dashed rgba(0,0,0,0.25)',
+                  }}>QR</div>
+                );
+              }
               const tx = fld.align === 'center' ? '-50%' : fld.align === 'right' ? '-100%' : '0';
               return (
-                <div
-                  key={i}
-                  onPointerDown={(e) => { e.preventDefault(); setSel(i); setDrag(i); }}
-                  title={fld.label}
-                  style={{
-                    position: 'absolute', left: `${fld.x}%`, top: `${fld.y}%`,
-                    transform: `translate(${tx}, -50%)`,
-                    fontSize: `${((Number(fld.size) || 5) / 100) * (disp.h || 700)}px`,
-                    fontWeight: fld.bold ? 700 : 400,
-                    fontFamily: fld.fontFamily || 'Helvetica, Arial, sans-serif',
-                    color: fld.color || '#111',
-                    whiteSpace: 'nowrap', cursor: 'move',
-                    padding: '0 2px',
-                    outline: i === sel ? '2px dashed var(--accent)' : '1px dashed rgba(0,0,0,0.25)',
-                  }}
-                >
+                <div {...common} style={{
+                  position: 'absolute', left: `${fld.x}%`, top: `${fld.y}%`,
+                  transform: `translate(${tx}, -50%)`,
+                  fontSize: `${((Number(fld.size) || 5) / 100) * (disp.h || 700)}px`,
+                  fontWeight: fld.bold ? 700 : 400,
+                  fontFamily: fld.fontFamily || 'Helvetica, Arial, sans-serif',
+                  color: fld.color || '#111',
+                  whiteSpace: 'nowrap', cursor: 'move', padding: '0 2px',
+                  outline: i === sel ? '2px dashed var(--accent)' : '1px dashed rgba(0,0,0,0.25)',
+                }}>
                   {SAMPLE[fld.key] ?? fld.label}
                 </div>
               );
@@ -356,19 +373,35 @@ function TemplateEditor({ initial, toast, onClose, onSaved }) {
             <div>
               <div className="hstack" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
                 <span className="kicker">Fields</span>
-                <Button size="sm" onClick={addField}>+ Add field</Button>
+                <div className="hstack" style={{ gap: 6 }}>
+                  <Button size="sm" onClick={addField}>+ Field</Button>
+                  <Button size="sm" onClick={addQr}>+ QR code</Button>
+                </div>
               </div>
               <div className="vstack" style={{ gap: 4 }}>
                 {fields.map((fld, i) => (
                   <div key={i} className={`row ${i === sel ? 'active' : ''}`} style={{ borderRadius: 8, cursor: 'pointer', outline: i === sel ? '1px solid var(--accent-border)' : 'none' }} onClick={() => setSel(i)}>
-                    <div className="grow"><div className="title">{fld.label}</div><div className="desc">key: {fld.key}</div></div>
+                    <div className="grow"><div className="title">{fld.label} {fld.type === 'qr' && <Badge color="purple">QR</Badge>}</div><div className="desc">key: {fld.key}</div></div>
                     <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); removeField(i); }}>✕</Button>
                   </div>
                 ))}
               </div>
             </div>
 
-            {f && (
+            {f && f.type === 'qr' && (
+              <div>
+                <span className="kicker">Verify QR</span>
+                <p style={{ color: 'var(--muted)', fontSize: 12, margin: '6px 0 8px' }}>
+                  Encodes a unique public link. Scanning it opens the certificate's verification page (no login) showing who it was issued to and when.
+                </p>
+                <Field label="Label"><Input value={f.label || ''} onChange={(e) => patch(sel, { label: e.target.value })} /></Field>
+                <div className="row-fields">
+                  <Field label={`Size (${f.size}% of height)`}><input type="range" min="4" max="30" step="0.5" value={f.size} onChange={(e) => patch(sel, { size: Number(e.target.value) })} style={{ width: '100%' }} /></Field>
+                  <Field label="Colour"><input type="color" value={f.color || '#000000'} onChange={(e) => patch(sel, { color: e.target.value })} style={{ width: 48, height: 32, background: 'none', border: 'none' }} /></Field>
+                </div>
+              </div>
+            )}
+            {f && f.type !== 'qr' && (
               <div>
                 <span className="kicker">Selected field</span>
                 <div className="row-fields" style={{ marginTop: 6 }}>
@@ -397,7 +430,7 @@ function TemplateEditor({ initial, toast, onClose, onSaved }) {
 
           <div style={{ marginTop: 14 }}>
             <span className="kicker">Live preview</span>
-            <div style={{ marginTop: 6 }}><CertificatePreview template={{ ...bg, width: dims.w, height: dims.h, fields }} values={SAMPLE} /></div>
+            <div style={{ marginTop: 6 }}><CertificatePreview template={{ ...bg, width: dims.w, height: dims.h, fields }} values={sampleValues()} /></div>
           </div>
         </>
       )}

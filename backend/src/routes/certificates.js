@@ -34,6 +34,32 @@ router.get('/bg/:file', (req, res) => {
   res.sendFile(abs);
 });
 
+// ---- Public: verify a certificate by its QR code (no auth) ----
+router.get('/verify/:code', ah(async (req, res) => {
+  const code = String(req.params.code || '').trim();
+  const c = code && (await q(
+    `SELECT c.serial, c.issued_at, c.values_json, s.name AS student_name,
+            ct.name AS program, b.name AS bootcamp_name
+     FROM certificates c
+     JOIN students s ON s.id = c.student_id
+     JOIN certificate_templates ct ON ct.id = c.template_id
+     LEFT JOIN bootcamps b ON b.id = c.bootcamp_id
+     WHERE c.verify_code = ? LIMIT 1`,
+    [code]
+  ))[0];
+  if (!c) throw new HttpError(404, 'No certificate matches this code');
+  const values = parseJson(c.values_json, {});
+  res.json({
+    valid: true,
+    name: c.student_name,
+    program: c.program,
+    bootcamp: c.bootcamp_name || null,
+    serial: c.serial || null,
+    date: values.date || null,
+    issued_at: c.issued_at,
+  });
+}));
+
 router.use(authRequired);
 
 // ================= Templates (admin) =================
@@ -118,6 +144,9 @@ router.post('/issue', requireRole('admin'), ah(async (req, res) => {
     const certId = r.insertId || (await q('SELECT id FROM certificates WHERE student_id = ? AND template_id = ?', [s.id, tpl.id]))[0].id;
     await q('UPDATE certificates SET serial = ? WHERE id = ? AND (serial IS NULL OR serial = "")',
       [`IOSDC-${year}-${String(certId).padStart(4, '0')}`, certId]);
+    // Stable, unguessable code for the public verification QR (kept across re-issues).
+    await q('UPDATE certificates SET verify_code = ? WHERE id = ? AND (verify_code IS NULL OR verify_code = "")',
+      [crypto.randomBytes(12).toString('hex'), certId]);
     issued.push(certId);
   }
   res.json({ issued: issued.length });
@@ -130,7 +159,7 @@ router.get('/', requireRole('admin'), ah(async (req, res) => {
   if (req.query.bootcamp) { where.push('c.bootcamp_id = ?'); params.push(Number(req.query.bootcamp)); }
   if (req.query.template) { where.push('c.template_id = ?'); params.push(Number(req.query.template)); }
   const rows = await q(
-    `SELECT c.id, c.student_id, c.template_id, c.serial, c.values_json, c.issued_at,
+    `SELECT c.id, c.student_id, c.template_id, c.serial, c.verify_code, c.values_json, c.issued_at,
             s.name AS student_name, s.email AS student_email, ct.name AS template_name
      FROM certificates c
      JOIN students s ON s.id = c.student_id
@@ -145,7 +174,7 @@ router.get('/', requireRole('admin'), ah(async (req, res) => {
 // GET /api/certificates/mine  (student) — their certificates + templates for rendering
 router.get('/mine', requireRole('student'), ah(async (req, res) => {
   const rows = await q(
-    `SELECT c.id, c.serial, c.values_json, c.issued_at, ct.*
+    `SELECT c.id, c.serial, c.verify_code, c.values_json, c.issued_at, ct.*
      FROM certificates c
      JOIN students s ON s.id = c.student_id
      JOIN certificate_templates ct ON ct.id = c.template_id
@@ -154,7 +183,7 @@ router.get('/mine', requireRole('student'), ah(async (req, res) => {
     [req.user.id]
   );
   res.json(rows.map((r) => ({
-    id: r.id, serial: r.serial, issued_at: r.issued_at,
+    id: r.id, serial: r.serial, verify_code: r.verify_code, issued_at: r.issued_at,
     values: parseJson(r.values_json, {}),
     template: templateOut(r),
   })));
@@ -173,7 +202,7 @@ router.get('/:id', ah(async (req, res) => {
   if (!c) throw new HttpError(404, 'Certificate not found');
   if (req.user.role !== 'admin' && c.owner_user_id !== req.user.id) throw new HttpError(403, 'Not your certificate');
   res.json({
-    id: c.id, serial: c.serial, issued_at: c.issued_at,
+    id: c.id, serial: c.serial, verify_code: c.verify_code, issued_at: c.issued_at,
     values: parseJson(c.values_json, {}),
     template: templateOut({ id: c.template_id, name: c.ct_name, background_path: c.background_path, width: c.width, height: c.height, fields: c.fields, is_default: c.is_default, created_at: c.ct_created }),
   });

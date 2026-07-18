@@ -1,25 +1,37 @@
 import { useEffect, useState } from 'react';
 import { BASE } from '../lib/api';
 
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 export const bgUrl = (template) => {
   const u = template?.background_url || '';
   if (!u) return '';
   return /^https?:/i.test(u) ? u : `${BASE}${u}`;
 };
 
-// Values available to fields for a sample render (editor preview).
-export const SAMPLE = {
+// Absolute public verification URL for a certificate code (what the QR encodes).
+export const verifyUrl = (code) => {
+  if (!code) return '';
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://iosdc.geu.ac.in';
+  return `${origin}${BASE_PATH}/verify/${code}`;
+};
+
+// Values for the editor's sample render.
+export const sampleValues = () => ({
   name: 'Saksham Joshi',
   date: '14 July – 17 July 2026',
   serial: 'IOSDC-2026-0001',
   issued_on: new Date().toLocaleDateString(),
-};
+  verify_url: verifyUrl('SAMPLE-CODE'),
+});
+export const SAMPLE = sampleValues();
 
 // The concrete value set for an issued certificate (merges auto keys).
 export const certValues = (cert) => ({
   ...(cert.values || {}),
   serial: cert.serial || '',
   issued_on: cert.issued_at ? new Date(cert.issued_at).toLocaleDateString() : '',
+  verify_url: verifyUrl(cert.verify_code),
 });
 
 const imgCache = new Map();
@@ -48,6 +60,21 @@ export async function renderCertificatePng(template, values, scale = 2) {
   for (const f of template.fields || []) {
     const val = values?.[f.key];
     if (val == null || val === '') continue;
+    if (f.type === 'qr') {
+      const side = ((Number(f.size) || 15) / 100) * h;
+      const QRCode = (await import('qrcode')).default;
+      const qrPx = Math.max(240, Math.round(side * 4));
+      const qrDataUrl = await QRCode.toDataURL(String(val), {
+        margin: 1, width: qrPx, color: { dark: f.color || '#000000', light: '#ffffff' },
+      });
+      const qrImg = await new Promise((res, rej) => {
+        const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('QR render failed')); im.src = qrDataUrl;
+      });
+      const cx = ((Number(f.x) || 85) / 100) * w;
+      const cy = ((Number(f.y) || 82) / 100) * h;
+      ctx.drawImage(qrImg, cx - side / 2, cy - side / 2, side, side);
+      continue;
+    }
     const size = ((Number(f.size) || 5) / 100) * h;
     ctx.font = `${f.bold ? '700' : '400'} ${size}px ${f.fontFamily || 'Helvetica, Arial, sans-serif'}`;
     ctx.fillStyle = f.color || '#111111';

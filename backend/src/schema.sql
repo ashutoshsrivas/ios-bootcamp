@@ -191,9 +191,11 @@ CREATE TABLE IF NOT EXISTS certificates (
   template_id INT NOT NULL,
   bootcamp_id INT NULL,
   serial VARCHAR(60) NULL,
+  verify_code VARCHAR(40) NULL,
   values_json JSON NULL,
   issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_cert (student_id, template_id),
+  UNIQUE KEY uniq_verify (verify_code),
   CONSTRAINT fk_cert_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
   CONSTRAINT fk_cert_template FOREIGN KEY (template_id) REFERENCES certificate_templates(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
