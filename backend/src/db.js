@@ -56,11 +56,11 @@ async function ensureColumn(table, column, definition) {
 // Make an existing NOT NULL column nullable (idempotent — only runs when needed).
 async function ensureNullable(table, column, definition) {
   const [rows] = await pool.query(
-    `SELECT is_nullable FROM information_schema.columns
+    `SELECT is_nullable AS n FROM information_schema.columns
      WHERE table_schema = ? AND table_name = ? AND column_name = ?`,
     [config.db.name, table, column]
   );
-  if (rows.length && rows[0].is_nullable === 'NO') {
+  if (rows.length && String(rows[0].n).toUpperCase() === 'NO') {
     await pool.query(`ALTER TABLE \`${table}\` MODIFY \`${column}\` ${definition}`);
   }
 }
