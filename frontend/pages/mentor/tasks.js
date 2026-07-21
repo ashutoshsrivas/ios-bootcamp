@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRequireRole, useAuth } from '../../lib/auth';
 import { useBootcamp, scoped } from '../../lib/bootcamp';
 import { api } from '../../lib/api';
+import { readDraft, writeDraft, clearDraft } from '../../lib/draft';
 import Layout, { PageHead } from '../../components/Layout';
 import { Card, Button, Loading, useToast, Badge, Select, Input, Textarea, Empty } from '../../components/UI';
 
@@ -18,6 +19,19 @@ export default function MentorTasks() {
   const [feedback, setFeedback] = useState('');
   const [score, setScore] = useState('');
   const [busy, setBusy] = useState(false);
+  const restored = useRef(false);
+
+  // Device-only draft keys (never sent to the server → invisible to admin, uncounted until Save).
+  const selKey = user ? `taskFbSel:${user.id}:${bootcampId}` : null;
+  const draftKey = (tid, teamid) => (user && tid && teamid ? `taskFbDraft:${user.id}:${bootcampId}:${tid}:${teamid}` : null);
+
+  // Feedback/score for a team = its local draft if present, else this mentor's saved value.
+  const applyForTeam = (tid, teamid, fbList) => {
+    const mine = fbList.find((f) => String(f.team_id) === String(teamid) && f.mentor_id === user?.id);
+    const draft = readDraft(draftKey(tid, teamid));
+    setFeedback(draft?.feedback ?? mine?.feedback ?? '');
+    setScore(draft?.score ?? mine?.score ?? '');
+  };
 
   useEffect(() => {
     if (!ok || !bootcampId) return;
@@ -27,23 +41,42 @@ export default function MentorTasks() {
   }, [ok, bootcampId]);
 
   const loadFeedback = async (tid) => {
-    if (!tid) { setAllFeedback([]); return; }
-    try { setAllFeedback(await api.get(`/api/tasks/${tid}/feedback`)); } catch (e) { toast.err(e.message); }
+    if (!tid) { setAllFeedback([]); return []; }
+    try { const fb = await api.get(`/api/tasks/${tid}/feedback`); setAllFeedback(fb); return fb; }
+    catch (e) { toast.err(e.message); return []; }
   };
 
+  // Restore the last task/team (and its draft) after an accidental back/navigation.
+  useEffect(() => {
+    if (!tasks || restored.current) return;
+    restored.current = true;
+    const sel = readDraft(selKey);
+    if (!sel?.taskId) return;
+    setTaskId(sel.taskId);
+    loadFeedback(sel.taskId).then((fb) => {
+      if (sel.teamId) { setTeamId(sel.teamId); applyForTeam(sel.taskId, sel.teamId, fb); }
+    });
+  }, [tasks]);
+
+  // Remember selection + auto-save the working feedback/score locally.
+  useEffect(() => {
+    if (!restored.current || !taskId || !teamId) return;
+    writeDraft(selKey, { taskId, teamId });
+  }, [taskId, teamId]);
+  useEffect(() => {
+    if (!taskId || !teamId) return;
+    writeDraft(draftKey(taskId, teamId), { feedback, score });
+  }, [feedback, score]);
+
   const onTask = (v) => { setTaskId(v); setTeamId(''); setFeedback(''); setScore(''); loadFeedback(v); };
-  const onTeam = (v) => {
-    setTeamId(v);
-    const mine = allFeedback.find((f) => String(f.team_id) === String(v) && f.mentor_id === user?.id);
-    setFeedback(mine?.feedback || '');
-    setScore(mine?.score ?? '');
-  };
+  const onTeam = (v) => { setTeamId(v); applyForTeam(taskId, v, allFeedback); };
 
   const save = async () => {
     if (!teamId) { toast.err('Pick a team'); return; }
     setBusy(true);
     try {
       await api.post(`/api/tasks/${taskId}/feedback`, { team_id: Number(teamId), feedback, score });
+      clearDraft(draftKey(taskId, teamId)); // saved to server — drop the local draft
       await loadFeedback(taskId);
       toast.ok('Feedback saved');
     } catch (e) { toast.err(e.message); }
@@ -88,7 +121,12 @@ export default function MentorTasks() {
                   <label>Score (optional)</label>
                   <Input type="number" value={score} onChange={(e) => setScore(e.target.value)} style={{ maxWidth: 160 }} />
                 </div>
-                <Button variant="primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save feedback'}</Button>
+                <div className="hstack" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <Button variant="primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save feedback'}</Button>
+                  <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>
+                    Auto-saved on this device — nothing is submitted until you press Save.
+                  </span>
+                </div>
               </>
             )}
           </Card>

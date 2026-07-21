@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
-import { useRequireRole } from '../../lib/auth';
+import { useEffect, useRef, useState } from 'react';
+import { useRequireRole, useAuth } from '../../lib/auth';
 import { useBootcamp, scoped } from '../../lib/bootcamp';
 import { api } from '../../lib/api';
+import { readDraft, writeDraft, clearDraft } from '../../lib/draft';
 import Layout, { PageHead } from '../../components/Layout';
 import { Card, Button, Loading, useToast, Badge, Avatar, Select, Input, Empty, Segmented } from '../../components/UI';
 
 export default function MentorAssess() {
   const { ok } = useRequireRole(['mentor']);
+  const { user } = useAuth();
   const { bootcampId } = useBootcamp() || {};
   const toast = useToast();
   const [rubrics, setRubrics] = useState(null);
@@ -18,6 +20,11 @@ export default function MentorAssess() {
   const [scores, setScores] = useState({}); // `${studentId}:${critId}` -> {score, comment}
   const [teamScores, setTeamScores] = useState({}); // `${critId}` -> {score, comment}  (team mode)
   const [busy, setBusy] = useState(false);
+  const restored = useRef(false);
+
+  // Local, device-only draft keys (never sent to the server → invisible to admin, uncounted until Save).
+  const selKey = user ? `assessSel:${user.id}:${bootcampId}` : null;
+  const draftKey = (rid, tid) => (user && rid && tid ? `assessDraft:${user.id}:${bootcampId}:${rid}:${tid}` : null);
 
   useEffect(() => {
     if (!ok || !bootcampId) return;
@@ -33,16 +40,43 @@ export default function MentorAssess() {
       setDetail(data);
       const map = {};
       data.scores.forEach((s) => { map[`${s.student_id}:${s.criteria_id}`] = { score: s.score, comment: s.comment || '' }; });
-      setScores(map);
       // Team-level prefill: take any existing member score per criterion (they're identical if saved as a team).
       const tmap = {};
       data.rubric.criteria.forEach((c) => {
         const found = data.scores.find((s) => s.criteria_id === c.id);
         if (found) tmap[c.id] = { score: found.score, comment: found.comment || '' };
       });
-      setTeamScores(tmap);
+      // Overlay any unsaved local draft on top of the saved baseline.
+      const draft = readDraft(draftKey(rid, tid));
+      setScores(draft?.scores ? { ...map, ...draft.scores } : map);
+      setTeamScores(draft?.teamScores ? { ...tmap, ...draft.teamScores } : tmap);
     } catch (e) { toast.err(e.message); }
   };
+
+  // Restore the last rubric/team/mode (and its draft) after an accidental back/navigation.
+  useEffect(() => {
+    if (!rubrics || restored.current) return;
+    restored.current = true;
+    const sel = readDraft(selKey);
+    if (sel?.rubricId && sel?.teamId) {
+      setRubricId(sel.rubricId);
+      setTeamId(sel.teamId);
+      if (sel.mode) setMode(sel.mode);
+      loadScores(sel.rubricId, sel.teamId);
+    }
+  }, [rubrics]);
+
+  // Remember the current selection.
+  useEffect(() => {
+    if (!restored.current || !rubricId || !teamId) return;
+    writeDraft(selKey, { rubricId, teamId, mode });
+  }, [rubricId, teamId, mode]);
+
+  // Auto-save the working scores/comments locally on every change.
+  useEffect(() => {
+    if (!detail || !rubricId || !teamId) return;
+    writeDraft(draftKey(rubricId, teamId), { scores, teamScores });
+  }, [scores, teamScores]);
 
   const onRubric = (v) => { setRubricId(v); loadScores(v, teamId); };
   const onTeam = (v) => { setTeamId(v); loadScores(rubricId, v); };
@@ -89,6 +123,7 @@ export default function MentorAssess() {
     setBusy(true);
     try {
       await api.post(`/api/rubrics/${rubricId}/scores`, { team_id: Number(teamId), scores: payload });
+      clearDraft(draftKey(rubricId, teamId)); // saved to server — drop the local draft
       // Refresh so the other mode reflects the new values.
       await loadScores(rubricId, teamId);
       toast.ok(mode === 'team' ? `Team score saved to all ${detail.students.length} members` : 'Scores saved');
@@ -196,9 +231,14 @@ export default function MentorAssess() {
                 </Card>
               ))
             )}
-            <Button variant="primary" onClick={save} disabled={busy}>
-              {busy ? 'Saving…' : mode === 'team' ? 'Save team score' : 'Save scores'}
-            </Button>
+            <div className="hstack" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <Button variant="primary" onClick={save} disabled={busy}>
+                {busy ? 'Saving…' : mode === 'team' ? 'Save team score' : 'Save scores'}
+              </Button>
+              <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>
+                Entries are auto-saved on this device — nothing is submitted or counted until you press Save.
+              </span>
+            </div>
           </>
         )
       )}

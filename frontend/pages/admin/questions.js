@@ -118,6 +118,9 @@ export default function AdminQuestions() {
             <div className="row" key={q.id}>
               <div className="grow">
                 <div className="title">{q.title}</div>
+                {q.description && (
+                  <div style={{ color: 'var(--muted)', fontSize: 13.5, margin: '3px 0 6px', whiteSpace: 'pre-wrap' }}>{q.description}</div>
+                )}
                 <div className="desc">
                   <Badge color="blue">{q.input_type}</Badge>{' '}
                   <Badge color="purple">{AUD_LABEL[q.audience]}</Badge>{' '}
