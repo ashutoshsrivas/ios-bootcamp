@@ -9,10 +9,15 @@ import {
 
 // ---- helpers ----
 const num = (v) => (v == null ? 0 : Number(v));
+// A row counts numerically only if it actually has a score (comment-only rows don't).
+const hasScore = (r) => r && r.score != null && r.score !== '';
 function pctOf(rows) {
   if (!rows || !rows.length) return null;
   let obtained = 0, possible = 0;
-  rows.forEach((r) => { const w = num(r.weight) || 1; obtained += num(r.score) * w; possible += num(r.max_score) * w; });
+  rows.forEach((r) => {
+    if (!hasScore(r)) return; // a comment without a score is not a zero
+    const w = num(r.weight) || 1; obtained += num(r.score) * w; possible += num(r.max_score) * w;
+  });
   return possible ? (obtained / possible) * 100 : null;
 }
 const pctColor = (p) => (p == null ? 'gray' : p >= 75 ? 'green' : p >= 50 ? 'orange' : 'red');
@@ -87,7 +92,7 @@ export default function AdminReports() {
       const overall = csvPct(pctOf(sRows));
       cols.forEach((c) => {
         sRows.filter((x) => x.criteria_id === c.id).forEach((r) => {
-          rows.push([rubric?.title, s.name, teamOf(s.team_id)?.name || '', c.name, c.max_score, c.weight, r.mentor_name, num(r.score), r.comment || '', overall]);
+          rows.push([rubric?.title, s.name, teamOf(s.team_id)?.name || '', c.name, c.max_score, c.weight, r.mentor_name, hasScore(r) ? num(r.score) : "", r.comment || '', overall]);
         });
       });
     });
@@ -103,7 +108,7 @@ export default function AdminReports() {
       const overall = csvPct(pctOf(sRows));
       if (!sRows.length) { rows.push([s.name, team, overall, '', '', '', '', '', '', '']); return; }
       sortRows(sRows).forEach((r) => {
-        rows.push([s.name, team, overall, rubrics.find((x) => x.id === r.rubric_id)?.title || '', r.criteria_name, r.max_score, r.weight, r.mentor_name, num(r.score), r.comment || '']);
+        rows.push([s.name, team, overall, rubrics.find((x) => x.id === r.rubric_id)?.title || '', r.criteria_name, r.max_score, r.weight, r.mentor_name, hasScore(r) ? num(r.score) : "", r.comment || '']);
       });
     });
     downloadCsv('results-students.csv', rows);
@@ -118,7 +123,7 @@ export default function AdminReports() {
       let any = false;
       members.forEach((m) => {
         sortRows(byStudent[m.id] || []).forEach((r) => {
-          rows.push([t.name, teamAvg, 'Rubric', rubrics.find((x) => x.id === r.rubric_id)?.title || '', m.name, r.criteria_name, r.max_score, r.mentor_name, num(r.score), r.comment || '']);
+          rows.push([t.name, teamAvg, 'Rubric', rubrics.find((x) => x.id === r.rubric_id)?.title || '', m.name, r.criteria_name, r.max_score, r.mentor_name, hasScore(r) ? num(r.score) : "", r.comment || '']);
           any = true;
         });
       });
@@ -157,9 +162,9 @@ export default function AdminReports() {
       mentors.forEach((m) => {
         cols.forEach((c) => {
           const r = sRows.find((x) => x.mentor_id === m.id && x.criteria_id === c.id);
-          row.push(r ? num(r.score) : '');
+          row.push(hasScore(r) ? num(r.score) : '');
         });
-        const mrs = sRows.filter((x) => x.mentor_id === m.id);
+        const mrs = sRows.filter((x) => x.mentor_id === m.id && hasScore(x));
         const mt = mrs.length ? mrs.reduce((a, x) => a + num(x.score), 0) : null;
         if (mt != null) mentorTotals.push(mt);
         row.push(mt == null ? '' : mt);
@@ -168,7 +173,7 @@ export default function AdminReports() {
         row.push(rem);
       });
       const at = avg(mentorTotals);
-      const grand = sRows.reduce((a, x) => a + num(x.score), 0);
+      const grand = sRows.reduce((a, x) => a + (hasScore(x) ? num(x.score) : 0), 0);
       row.push(grand, at == null ? '' : Math.round(at * 10) / 10, maxTotal, csvPct(pctOf(sRows)));
       rows.push(row);
     });
@@ -323,7 +328,7 @@ function RubricView({ rubrics, rubricId, setRubricId, criteria, students, scores
   const cols = criteria.filter((c) => c.rubric_id === rid);
   const rowsFor = (sid) => scores.filter((s) => s.student_id === sid && s.rubric_id === rid);
   const cell = (sid, cid) => {
-    const ms = scores.filter((s) => s.student_id === sid && s.criteria_id === cid);
+    const ms = scores.filter((s) => s.student_id === sid && s.criteria_id === cid && hasScore(s));
     if (!ms.length) return { avg: null, n: 0 };
     return { avg: avg(ms.map((m) => num(m.score))), n: ms.length };
   };
@@ -394,12 +399,12 @@ function MatrixView({ rubrics, rubricId, setRubricId, criteria, students, teams,
 
   const cell = (sRows, mid, cid) => {
     const r = sRows.find((x) => x.mentor_id === mid && x.criteria_id === cid);
-    return r ? num(r.score) : null;
+    return hasScore(r) ? num(r.score) : null;
   };
   const remark = (sRows, mid) => sRows.filter((x) => x.mentor_id === mid && x.comment)
     .map((x) => (cols.length > 1 ? `${x.criteria_name}: ${x.comment}` : x.comment)).join(' · ');
   const mentorTotal = (sRows, mid) => {
-    const rs = sRows.filter((x) => x.mentor_id === mid);
+    const rs = sRows.filter((x) => x.mentor_id === mid && hasScore(x));
     return rs.length ? rs.reduce((a, x) => a + num(x.score), 0) : null;
   };
 
@@ -448,7 +453,7 @@ function MatrixView({ rubrics, rubricId, setRubricId, criteria, students, teams,
                 const p = pctOf(sRows);
                 const totals = mentors.map((m) => mentorTotal(sRows, m.id)).filter((x) => x != null);
                 const at = avg(totals);
-                const grand = sRows.reduce((a, x) => a + num(x.score), 0);
+                const grand = sRows.reduce((a, x) => a + (hasScore(x) ? num(x.score) : 0), 0);
                 const team = teams.find((t) => t.id === s.team_id);
                 return (
                   <tr key={s.id}>
@@ -511,7 +516,7 @@ function StudentBreakdown({ student, scores, rubrics, criteria }) {
                       {cRows.map((r, i) => (
                         <div key={i} className="hstack" style={{ alignItems: 'flex-start', gap: 10 }}>
                           <Badge color="blue">{r.mentor_name}</Badge>
-                          <Badge color="gray">{num(r.score)}/{r.max_score}</Badge>
+                          <Badge color="gray">{hasScore(r) ? num(r.score) : '—'}/{r.max_score}</Badge>
                           {r.comment && <span style={{ fontSize: 13, color: 'var(--text-2)' }}>“{r.comment}”</span>}
                         </div>
                       ))}

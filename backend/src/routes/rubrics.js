@@ -148,12 +148,15 @@ router.post(
     }
 
     for (const s of scores) {
-      if (s.score === '' || s.score === null || s.score === undefined) continue;
+      const hasScore = !(s.score === '' || s.score === null || s.score === undefined);
+      const comment = (s.comment ?? '').toString().trim();
+      // Skip rows with neither a score nor a comment.
+      if (!hasScore && !comment) continue;
       await q(
         `INSERT INTO rubric_scores (criteria_id, student_id, team_id, mentor_id, score, comment)
          VALUES (?,?,?,?,?,?)
          ON DUPLICATE KEY UPDATE score = VALUES(score), comment = VALUES(comment), team_id = VALUES(team_id)`,
-        [s.criteria_id, s.student_id, team_id || null, req.user.id, Number(s.score), s.comment || null]
+        [s.criteria_id, s.student_id, team_id || null, req.user.id, hasScore ? Number(s.score) : null, comment || null]
       );
     }
     res.json({ ok: true });

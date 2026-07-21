@@ -101,21 +101,19 @@ export default function MentorAssess() {
     };
 
     const payload = [];
+    // Save a row when there's a score OR a comment (comment-only is allowed).
+    const pushCell = (cid, sid, cell) => {
+      const n = collect(cid, cell?.score);
+      const comment = (cell?.comment || '').trim();
+      if (n != null || comment) payload.push({ criteria_id: cid, student_id: sid, score: n, comment });
+    };
     if (mode === 'team') {
       detail.students.forEach((s) => {
-        detail.rubric.criteria.forEach((c) => {
-          const cell = teamScores[c.id];
-          const n = collect(c.id, cell?.score);
-          if (n != null) payload.push({ criteria_id: c.id, student_id: s.id, score: n, comment: cell.comment || '' });
-        });
+        detail.rubric.criteria.forEach((c) => pushCell(c.id, s.id, teamScores[c.id]));
       });
     } else {
       detail.students.forEach((s) => {
-        detail.rubric.criteria.forEach((c) => {
-          const cell = scores[`${s.id}:${c.id}`];
-          const n = collect(c.id, cell?.score);
-          if (n != null) payload.push({ criteria_id: c.id, student_id: s.id, score: n, comment: cell.comment || '' });
-        });
+        detail.rubric.criteria.forEach((c) => pushCell(c.id, s.id, scores[`${s.id}:${c.id}`]));
       });
     }
     if (bad) { toast.err(bad); return; }

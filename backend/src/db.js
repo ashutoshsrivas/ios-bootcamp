@@ -53,6 +53,18 @@ async function ensureColumn(table, column, definition) {
   }
 }
 
+// Make an existing NOT NULL column nullable (idempotent — only runs when needed).
+async function ensureNullable(table, column, definition) {
+  const [rows] = await pool.query(
+    `SELECT is_nullable FROM information_schema.columns
+     WHERE table_schema = ? AND table_name = ? AND column_name = ?`,
+    [config.db.name, table, column]
+  );
+  if (rows.length && rows[0].is_nullable === 'NO') {
+    await pool.query(`ALTER TABLE \`${table}\` MODIFY \`${column}\` ${definition}`);
+  }
+}
+
 // Bring pre-existing databases up to the multi-bootcamp schema.
 async function migrate() {
   await ensureColumn('students', 'bootcamp_id', 'INT NULL');
@@ -68,6 +80,8 @@ async function migrate() {
   await ensureColumn('questions', 'bootcamp_id', 'INT NULL');
   await ensureColumn('certificates', 'verify_code', 'VARCHAR(40) NULL');
   await ensureColumn('certificates', 'revoked', 'TINYINT NOT NULL DEFAULT 0');
+  // Allow comment-only rubric scores (a mentor may leave a comment without a number).
+  await ensureNullable('rubric_scores', 'score', 'DECIMAL(6,2) NULL');
 }
 
 async function seedDefaults() {
