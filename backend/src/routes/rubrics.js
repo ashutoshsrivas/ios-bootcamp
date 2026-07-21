@@ -150,8 +150,14 @@ router.post(
     for (const s of scores) {
       const hasScore = !(s.score === '' || s.score === null || s.score === undefined);
       const comment = (s.comment ?? '').toString().trim();
-      // Skip rows with neither a score nor a comment.
-      if (!hasScore && !comment) continue;
+      if (!hasScore && !comment) {
+        // Cleared cell → remove this mentor's row so the new (empty) state wins.
+        await q(
+          `DELETE FROM rubric_scores WHERE criteria_id = ? AND student_id = ? AND mentor_id = ?`,
+          [s.criteria_id, s.student_id, req.user.id]
+        );
+        continue;
+      }
       await q(
         `INSERT INTO rubric_scores (criteria_id, student_id, team_id, mentor_id, score, comment)
          VALUES (?,?,?,?,?,?)

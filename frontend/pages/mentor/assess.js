@@ -101,11 +101,17 @@ export default function MentorAssess() {
     };
 
     const payload = [];
-    // Save a row when there's a score OR a comment (comment-only is allowed).
+    // Cells this mentor already has saved — send them even when now empty so a
+    // cleared score+comment deletes the old row instead of leaving it behind.
+    const existing = new Set((detail.scores || []).map((s) => `${s.student_id}:${s.criteria_id}`));
+    // Save a row when there's a score OR a comment (comment-only is allowed);
+    // send an empty row when the cell previously existed (→ delete on the server).
     const pushCell = (cid, sid, cell) => {
       const n = collect(cid, cell?.score);
       const comment = (cell?.comment || '').trim();
-      if (n != null || comment) payload.push({ criteria_id: cid, student_id: sid, score: n, comment });
+      if (n != null || comment || existing.has(`${sid}:${cid}`)) {
+        payload.push({ criteria_id: cid, student_id: sid, score: n, comment });
+      }
     };
     if (mode === 'team') {
       detail.students.forEach((s) => {

@@ -119,11 +119,19 @@ router.post(
     const taskId = Number(req.params.id);
     const { team_id, feedback, score } = req.body || {};
     if (!team_id) throw new HttpError(400, 'team_id is required');
+    const fb = (feedback ?? '').toString().trim();
+    const hasScore = !(score === '' || score === null || score === undefined);
+    if (!fb && !hasScore) {
+      // Cleared both → remove this mentor's feedback row entirely.
+      await q(`DELETE FROM task_feedback WHERE task_id = ? AND team_id = ? AND mentor_id = ?`,
+        [taskId, Number(team_id), req.user.id]);
+      return res.json({ ok: true, deleted: true });
+    }
     await q(
       `INSERT INTO task_feedback (task_id, team_id, mentor_id, feedback, score)
        VALUES (?,?,?,?,?)
        ON DUPLICATE KEY UPDATE feedback = VALUES(feedback), score = VALUES(score)`,
-      [taskId, Number(team_id), req.user.id, feedback || null, score === '' || score == null ? null : Number(score)]
+      [taskId, Number(team_id), req.user.id, fb || null, hasScore ? Number(score) : null]
     );
     res.json({ ok: true });
   })
