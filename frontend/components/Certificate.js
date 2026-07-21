@@ -46,8 +46,15 @@ function loadImage(src) {
   });
 }
 
-// Render template + values to a PNG data URL (same path used for on-screen preview).
-export async function renderCertificatePng(template, values, scale = 2) {
+// Natural pixel size of a template's background (falls back to stored/default dims).
+export async function templateDims(template) {
+  try { const img = await loadImage(bgUrl(template)); return { w: img.naturalWidth, h: img.naturalHeight }; }
+  catch { return { w: template.width || 1000, h: template.height || 707 }; }
+}
+
+// Render template + values to an image data URL. type 'image/jpeg' yields a much
+// smaller file (used for bulk PDF export); 'image/png' is used for single downloads/preview.
+export async function renderCertificateDataUrl(template, values, { scale = 2, type = 'image/png', quality = 0.95 } = {}) {
   const img = await loadImage(bgUrl(template));
   const w = img.naturalWidth || template.width || 1000;
   const h = img.naturalHeight || template.height || 700;
@@ -56,6 +63,7 @@ export async function renderCertificatePng(template, values, scale = 2) {
   canvas.height = Math.round(h * scale);
   const ctx = canvas.getContext('2d');
   ctx.scale(scale, scale);
+  if (type === 'image/jpeg') { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h); } // JPEG has no alpha
   ctx.drawImage(img, 0, 0, w, h);
   for (const f of template.fields || []) {
     const val = values?.[f.key];
@@ -82,7 +90,12 @@ export async function renderCertificatePng(template, values, scale = 2) {
     ctx.textBaseline = 'middle';
     ctx.fillText(String(val), ((Number(f.x) || 50) / 100) * w, ((Number(f.y) || 50) / 100) * h);
   }
-  return canvas.toDataURL('image/png');
+  return canvas.toDataURL(type, quality);
+}
+
+// PNG data URL (single downloads + preview).
+export function renderCertificatePng(template, values, scale = 2) {
+  return renderCertificateDataUrl(template, values, { scale, type: 'image/png' });
 }
 
 export function downloadDataUrl(dataUrl, filename) {

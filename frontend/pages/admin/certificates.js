@@ -7,7 +7,8 @@ import {
   Card, Button, Loading, useToast, Badge, Modal, Field, Input, Select, Segmented, Empty, Switch,
 } from '../../components/UI';
 import {
-  bgUrl, SAMPLE, sampleValues, certValues, CertificatePreview, renderCertificatePng, downloadDataUrl,
+  bgUrl, SAMPLE, sampleValues, certValues, CertificatePreview, renderCertificatePng,
+  renderCertificateDataUrl, templateDims, downloadDataUrl,
 } from '../../components/Certificate';
 
 const AUTO_KEYS = ['name', 'serial', 'issued_on', 'verify_url'];
@@ -69,6 +70,7 @@ function IssuePanel({ templates, bootcampId, toast, onNeedTemplate }) {
   const [issued, setIssued] = useState([]);
   const [busy, setBusy] = useState(false);
   const [viewing, setViewing] = useState(null);
+  const [zipping, setZipping] = useState('');
 
   const tpl = templates.find((t) => t.id === Number(templateId));
   const promptFields = (tpl?.fields || []).filter((f) => !AUTO_KEYS.includes(f.key));
@@ -125,6 +127,36 @@ function IssuePanel({ templates, bootcampId, toast, onNeedTemplate }) {
       const url = await renderCertificatePng(tpl, certValues(cert), 2);
       downloadDataUrl(url, `${(cert.student_name || 'certificate').replace(/[^\w]+/g, '_')}-certificate.png`);
     } catch (e) { toast.err(e.message); }
+  };
+
+  // Render every issued certificate to a PDF (named by student) and bundle into one ZIP.
+  const downloadAllZip = async () => {
+    if (!tpl || !issued.length) { toast.show('Nothing to export'); return; }
+    setZipping(`0/${issued.length}`);
+    try {
+      const [{ default: JSZip }, { jsPDF }] = await Promise.all([import('jszip'), import('jspdf')]);
+      const { w, h } = await templateDims(tpl);
+      const zip = new JSZip();
+      const used = {};
+      for (let i = 0; i < issued.length; i++) {
+        const cert = issued[i];
+        setZipping(`${i + 1}/${issued.length}`);
+        const img = await renderCertificateDataUrl(tpl, certValues(cert), { scale: 1.6, type: 'image/jpeg', quality: 0.94 });
+        const pdf = new jsPDF({ orientation: w >= h ? 'landscape' : 'portrait', unit: 'px', format: [w, h], compress: true });
+        const pw = pdf.internal.pageSize.getWidth();
+        const ph = pdf.internal.pageSize.getHeight();
+        pdf.addImage(img, 'JPEG', 0, 0, pw, ph);
+        // Filename = student name, de-duplicated.
+        let base = (cert.student_name || 'certificate').replace(/[^\w .()-]+/g, ' ').replace(/\s+/g, ' ').trim() || 'certificate';
+        used[base] = (used[base] || 0) + 1;
+        if (used[base] > 1) base = `${base} (${used[base]})`;
+        zip.file(`${base}.pdf`, pdf.output('blob'));
+      }
+      const out = await zip.generateAsync({ type: 'blob' });
+      downloadDataUrl(URL.createObjectURL(out), `certificates-${(tpl.name || 'template').replace(/[^\w.-]+/g, '-')}.zip`);
+      toast.ok(`Downloaded ${issued.length} certificate PDF${issued.length === 1 ? '' : 's'}`);
+    } catch (e) { toast.err(e.message); }
+    setZipping('');
   };
 
   const toggleRevoke = async (cert) => {
@@ -194,7 +226,14 @@ function IssuePanel({ templates, bootcampId, toast, onNeedTemplate }) {
         </Card>
 
         <Card>
-          <h3 style={{ marginBottom: 8 }}>Issued <Badge color="gray">{issued.length}</Badge></h3>
+          <div className="hstack" style={{ justifyContent: 'space-between', marginBottom: 8, gap: 8 }}>
+            <h3>Issued <Badge color="gray">{issued.length}</Badge></h3>
+            {issued.length > 0 && (
+              <Button size="sm" onClick={downloadAllZip} disabled={!!zipping}>
+                {zipping ? `Preparing ${zipping}…` : '⤓ All PDFs (ZIP)'}
+              </Button>
+            )}
+          </div>
           {issued.length === 0 ? (
             <p style={{ color: 'var(--muted)', fontSize: 14 }}>No certificates issued for this template yet.</p>
           ) : (
